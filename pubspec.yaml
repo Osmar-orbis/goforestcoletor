@@ -1,0 +1,87 @@
+name: geoforestcoletor
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase e Gerenciamento de Estado
+  firebase_core: ^2.27.0
+  firebase_auth: ^4.17.8
+  cloud_firestore: ^4.15.8
+  provider: ^6.1.2
+  ml_linalg: ^13.12.6
+
+  # Mapa e Geometria
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
+  geolocator: ^11.1.0
+  proj4dart: ^2.1.0
+    
+  # Banco de Dados Local
+  sqflite: ^2.3.2
+  sqflite_common_ffi: ^2.3.3
+
+  # Utilitários e UI
+  cupertino_icons: ^1.0.8
+  intl: ^0.18.1
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  path_provider_android: ^2.2.4 # <<< DEPENDÊNCIA NECESSÁRIA ADICIONADA
+  shared_preferences: ^2.2.2
+  device_info_plus: ^9.1.2
+  permission_handler: ^11.3.1
+  
+  # Ferramentas de Arquivos e Compartilhamento
+  file_picker: ^8.0.0+1
+  share_plus: ^8.0.2
+  csv: ^6.0.0
+  shapefile: ^1.0.1
+  pdf: ^3.10.8
+  open_file: ^3.3.2
+
+  # Widgets de UI
+  flutter_slidable: ^3.1.0
+  flutter_speed_dial: ^7.0.0
+  url_launcher: ^6.2.6
+  connectivity_plus: ^6.1.4
+  flutter_map_line_editor: ^6.0.0
+  flutter_map_dragmarker: ^6.0.0
+  fl_chart: ^0.68.0
+  flutter_archive: ^6.0.3
+
+  # Fotos
+  image_picker: ^1.0.7
+  simple_animations: ^5.2.0
+
+  # Vitrines
+  flutter_stripe: ^10.1.1 # Verifique a versão mais recente no pub.dev
+  cloud_functions: ^4.7.6
+  
+  
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+  flutter_launcher_icons: "^0.13.1" # <<< LINHA ADICIONADA (use a versão mais recente)
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/ # <-- É uma boa prática declarar a pasta do ícone aqui também
+
+# Esta seção está correta e no lugar certo (no mesmo nível de 'flutter:')
+flutter_icons: 
+  android: true # Pode usar "true" para configurações padrão ou "launcher_icon" para nomear o ícone
+  ios: true 
+  image_path: "assets/icons/icon3.png" 
+  remove_alpha_ios: true
+
+    
