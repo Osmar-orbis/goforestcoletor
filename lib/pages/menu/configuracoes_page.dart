@@ -1,9 +1,10 @@
-// lib/pages/menu/configuracoes_page.dart (VERSÃO COM BOTÃO DE SAIR/LOGOUT)
+// lib/pages/menu/configuracoes_page.dart (VERSÃO CORRIGIDA)
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:geoforestcoletor/controller/login_controller.dart'; // <<< MUDANÇA >>> Import do LoginController
-import 'package:provider/provider.dart'; // <<< MUDANÇA >>> Import do Provider
+import 'package:geoforestcoletor/controller/login_controller.dart';
+import 'package:geoforestcoletor/pages/menu/login_page.dart'; // <<< IMPORT ADICIONADO
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
@@ -81,7 +82,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
     required String titulo,
     required String conteudo,
     required VoidCallback onConfirmar,
-    bool isDestructive = true, // <<< MUDANÇA >>> Parâmetro para estilizar o botão
+    bool isDestructive = true,
   }) async {
     final bool? confirmado = await showDialog<bool>(
       context: context,
@@ -90,7 +91,6 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
         content: Text(conteudo),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          // <<< MUDANÇA >>> Botão de confirmação estilizado
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
@@ -107,17 +107,23 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
     }
   }
 
-  // <<< MUDANÇA >>> Nova função para lidar com o logout
+  // <<< FUNÇÃO CORRIGIDA >>>
   Future<void> _handleLogout() async {
     await _mostrarDialogoLimpeza(
       titulo: 'Confirmar Saída',
       conteudo: 'Tem certeza de que deseja sair da sua conta?',
-      isDestructive: false, // Não é uma ação destrutiva de dados
+      isDestructive: false,
       onConfirmar: () async {
         // Usa o Provider para acessar o LoginController e chamar o método signOut
         await context.read<LoginController>().signOut();
-        // A navegação de volta para a tela de login é tratada automaticamente
-        // pelo Consumer no main.dart, então não precisamos fazer nada aqui.
+        
+        // FORÇA a navegação para a tela de login e limpa todas as telas anteriores
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+            (Route<dynamic> route) => false,
+          );
+        }
       },
     );
   }
@@ -146,7 +152,6 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // <<< MUDANÇA >>> Seção de Conta adicionada
                   const Text('Conta', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.indigo)),
                   const SizedBox(height: 8),
                   Card(
@@ -172,7 +177,6 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                                     ),
                         ),
                         const Divider(height: 1),
-                        // <<< MUDANÇA >>> ListTile para o botão de "Sair"
                         ListTile(
                           leading: const Icon(Icons.logout, color: Colors.red),
                           title: const Text('Sair da Conta', style: TextStyle(color: Colors.red)),
@@ -263,7 +267,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                       child: const Text('Debug de Permissões', style: TextStyle(color: Colors.black)),
                     ),
                   ),
-                  const SizedBox(height: 20), // Espaço extra no final
+                  const SizedBox(height: 20), 
                 ],
               ),
             ),

@@ -4,12 +4,24 @@
     <!-- Permissões essenciais -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     
-
-    <!-- Permissões de Localização (GPS) Adicionadas Explicitamente -->
+    <!-- Permissões de Localização (GPS) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- ================================================================ -->
+    <!-- PERMISSÕES DE ARQUIVOS CORRIGIDAS (ADICIONE O BLOCO ABAIXO) -->
+    <!-- ================================================================ -->
+
+    <!-- Permissão para Android 10 e inferior -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    
+    <!-- Permissão para Android 11 e superior (ESSENCIAL PARA IMPORTAÇÃO) -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    
+    <!-- ================================================================ -->
+    
 
     <application
         android:label="geoforestcoletor"
@@ -35,7 +47,6 @@
             </intent-filter>
         </activity>
         
-        <!-- Desabilita a inicialização automática do Firebase para evitar conflitos -->
         <provider
             android:name="com.google.firebase.provider.FirebaseInitProvider"
             android:authorities="${applicationId}.firebaseinitprovider"
@@ -43,7 +54,6 @@
             android:initOrder="99"
             tools:node="remove" />
 
-        <!-- Desabilita a coleta de dados de performance na inicialização -->
         <meta-data
             android:name="firebase_performance_collection_enabled"
             android:value="false" />

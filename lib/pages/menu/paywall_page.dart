@@ -52,8 +52,8 @@ class _PaywallPageState extends State<PaywallPage> {
     PlanoAssinatura(
       nome: "Básico",
       descricao: "Para equipes pequenas e projetos iniciais.",
-      precoAnualId: "price_1RkZkfCDD1ZXEMnaxwnKUztS",
-      precoMensalId: "price_1RkZpNCDD1ZXEMnaHSNKhOt8",
+      precoAnualId: "price_1RldvcCHDKuxFKvWbyrIMf1B", 
+      precoMensalId: "price_1RldvcCHDKuxFKvWFSENoSNg",
       valorAnual: "R\$ 5.000",
       valorMensal: "R\$ 600",
       icone: Icons.person_outline,
@@ -63,8 +63,8 @@ class _PaywallPageState extends State<PaywallPage> {
     PlanoAssinatura(
       nome: "Profissional",
       descricao: "Ideal para empresas em crescimento.",
-      precoAnualId: "price_1RkZsdCDD1ZXEMnaSDcWqJj7",
-      precoMensalId: "price_1RkZt2CDD1ZXEMnaNtZkAniK",
+      precoAnualId: "price_1RldvaCHDKuxFKvWyAEb0cad",
+      precoMensalId: "price_1RldvZCHDKuxFKvWCWoQ3jzW",
       valorAnual: "R\$ 9.000",
       valorMensal: "R\$ 850",
       icone: Icons.business_center_outlined,
@@ -74,8 +74,8 @@ class _PaywallPageState extends State<PaywallPage> {
     PlanoAssinatura(
       nome: "Premium",
       descricao: "A solução completa para grandes operações.",
-      precoAnualId: "price_1RkZv1CDD1ZXEMnaOO4Re7lF",
-      precoMensalId: "price_1RkZwWCDD1ZXEMnaHCY7sn5M",
+      precoAnualId: "price_1RldvVCHDKuxFKvWjxNtR4xC",
+      precoMensalId: "price_1RldvVCHDKuxFKvWiE0MzIDm",
       valorAnual: "R\$ 15.000",
       valorMensal: "R\$ 1.500",
       icone: Icons.star_border_outlined,
