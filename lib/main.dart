@@ -21,7 +21,7 @@ import 'package:geoforestcoletor/pages/menu/splash_page.dart';
 import 'package:geoforestcoletor/providers/license_provider.dart';
 import 'package:geoforestcoletor/pages/menu/paywall_page.dart';
 
-const String stripePublishableKey = "pk_test_51RkZX4CDD1ZXEMnappGalnI3AorF9k7lfJbz5ASr8Nw0NyIOcyeVdNkZ4Qk6P3MT8fjRxXTV7B2hNvATzYUjnRd500sXViBsFh";
+const String stripePublishableKey = "pk_live_51RkZWtCHDKuxFKvWkctCa29ioADWA8XaBx1cown7ePUCYyzCuSrlH8bW9kjDe2WcxbPUE6jQtnu6Vnyk1jNza6od006AkUPbgv";
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
