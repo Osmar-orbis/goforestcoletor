@@ -1,4 +1,7 @@
-// Arquivo: android/app/build.gradle.kts
+// ARQUIVO: android/app/build.gradle.kts (VERSÃO COM A CORREÇÃO FINAL)
+
+import java.util.Properties
+import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
@@ -7,19 +10,31 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// <<< A CORREÇÃO ESTÁ AQUI >>>
+// O caminho correto é apenas "key.properties", não "android/key.properties"
+val keyPropertiesFile = rootProject.file("key.properties") 
+val keyProperties = Properties()
+if (keyPropertiesFile.exists()) {
+    keyProperties.load(FileInputStream(keyPropertiesFile))
+}
+
 android {
     namespace = "com.example.geoforestcoletor"
-    
-    // ALTERE ESTA LINHA DE 34 PARA 35
     compileSdk = 35
+
+    signingConfigs {
+        create("release") {
+            keyAlias = keyProperties.getProperty("keyAlias")
+            keyPassword = keyProperties.getProperty("keyPassword")
+            storeFile = file(keyProperties.getProperty("storeFile"))
+            storePassword = keyProperties.getProperty("storePassword")
+        }
+    }
 
     defaultConfig {
         applicationId = "com.example.geoforestcoletor"
         minSdk = 23
-        
-        // É UMA BOA PRÁTICA ALINHAR ESTA LINHA TAMBÉM
         targetSdk = 35
-        
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled = true
@@ -39,8 +54,9 @@ android {
     }
 
     buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("debug")
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+                        
         }
     }
 }
@@ -50,9 +66,7 @@ flutter {
 }
 
 dependencies {
-    // Esta linha também lê a variável do gradle.properties
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:${property("kotlinVersion")}")
-
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("com.google.firebase:firebase-perf-ktx")
 }

@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
+// import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
@@ -21,7 +21,6 @@ import 'package:geoforestcoletor/pages/menu/splash_page.dart';
 import 'package:geoforestcoletor/providers/license_provider.dart';
 import 'package:geoforestcoletor/pages/menu/paywall_page.dart';
 
-const String stripePublishableKey = "pk_live_51RkZWtCHDKuxFKvWkctCa29ioADWA8XaBx1cown7ePUCYyzCuSrlH8bW9kjDe2WcxbPUE6jQtnu6Vnyk1jNza6od006AkUPbgv";
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,9 +58,7 @@ class _AppInitializerState extends State<AppInitializer> {
       [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown],
     );
 
-    Stripe.publishableKey = stripePublishableKey;
-    await Stripe.instance.applySettings();
-
+   
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;

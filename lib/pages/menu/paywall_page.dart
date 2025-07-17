@@ -1,16 +1,10 @@
-// lib/pages/menu/paywall_page.dart
+// ARQUIVO: lib/pages/menu/paywall_page.dart (VERSÃO COMPLETA E CORRIGIDA)
 
 import 'package:flutter/material.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-// ADICIONADO: Pacote para abrir a URL de pagamento no navegador.
 import 'package:url_launcher/url_launcher.dart';
 
-// O pacote do Stripe não é mais necessário nesta página para a abordagem de Checkout.
-// Se você não o usa em mais nenhum lugar, pode até removê-lo do pubspec.yaml.
-// import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
-
-// Modelo simples para representar um plano
+// Modelo para representar um plano. Não precisa de alteração.
 class PlanoAssinatura {
   final String nome;
   final String descricao;
@@ -43,8 +37,8 @@ class PaywallPage extends StatefulWidget {
 }
 
 class _PaywallPageState extends State<PaywallPage> {
-  bool _isLoading = false;
-
+  // A lista de planos permanece a mesma, para exibir o catálogo.
+  // Os IDs de preço do Stripe não são mais usados, mas podemos mantê-los por enquanto.
   final List<PlanoAssinatura> planos = [
     PlanoAssinatura(
       nome: "Básico",
@@ -81,58 +75,36 @@ class _PaywallPageState extends State<PaywallPage> {
     ),
   ];
 
-  // =========================================================================
-  // MÉTODO _iniciarCheckout COMPLETAMENTE SUBSTITUÍDO PELA VERSÃO SIMPLIFICADA
-  // =========================================================================
-  Future<void> _iniciarCheckout(String priceId) async {
-    setState(() => _isLoading = true);
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception("Usuário não está logado.");
-      }
-
-      // 1. Chama a Cloud Function. Ela fará o trabalho pesado de criar a sessão.
-      //    (Certifique-se de que sua Cloud Function está atualizada para retornar a URL).
-      final functions = FirebaseFunctions.instanceFor(region: "southamerica-east1");
-      final callable = functions.httpsCallable('createCheckoutSession');
-      final response = await callable.call<Map<String, dynamic>>({'priceId': priceId});
-
-      // 2. A função agora retorna apenas uma URL.
-      final String? url = response.data['url'];
-
-      if (url != null) {
-        final uri = Uri.parse(url);
-        // 3. Abre a página de pagamento segura do Stripe no navegador do celular.
-        //    O Stripe cuida de todo o resto (cartão, validação, etc).
-        if (await canLaunchUrl(uri)) {
-          // Usar 'externalApplication' garante que abrirá no Chrome/Safari,
-          // o que é mais robusto que uma webview dentro do app.
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          throw 'Não foi possível abrir a página de pagamento.';
-        }
-      } else {
-        // Isso acontece se a Cloud Function falhar e não retornar uma URL.
-        throw 'URL de pagamento inválida recebida do servidor.';
-      }
-
-    } on FirebaseFunctionsException catch (e) {
+  /// Esta função gera a mensagem e abre o WhatsApp.
+  Future<void> iniciarContatoWhatsApp(PlanoAssinatura plano, String tipoCobranca) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erro de comunicação com o servidor: ${e.message}"), backgroundColor: Colors.red),
+          const SnackBar(content: Text("Erro: Usuário não encontrado. Por favor, faça login novamente."))
         );
       }
-    } catch (e) {
+      return;
+    }
+
+    // !! IMPORTANTE !! TROQUE ESTE NÚMERO PELO SEU NÚMERO COMERCIAL !!
+    final String seuNumeroWhatsApp = "5515981409153"; 
+    
+    final String nomePlano = plano.nome;
+    final String emailUsuario = user.email ?? "Email não disponível";
+
+    final String mensagem = "Olá! Tenho interesse em contratar o *$nomePlano ($tipoCobranca)* para o GeoForest Analytics. Meu email de cadastro é: $emailUsuario";
+    
+    final String urlWhatsApp = "https://wa.me/$seuNumeroWhatsApp?text=${Uri.encodeComponent(mensagem)}";
+    final Uri uri = Uri.parse(urlWhatsApp);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Ocorreu um erro inesperado: ${e.toString()}"), backgroundColor: Colors.red),
+          const SnackBar(content: Text("Não foi possível abrir o WhatsApp. Certifique-se de que ele está instalado."))
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
       }
     }
   }
@@ -141,55 +113,37 @@ class _PaywallPageState extends State<PaywallPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Escolha seu Plano"), centerTitle: true),
-      body: Stack(
+      body: ListView( // Simplificado, removido o Stack pois _isLoading não é mais necessário
+        padding: const EdgeInsets.all(16.0),
         children: [
-          ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              const Text(
-                "Aproveite o Futuro em Análises e Coletas Florestais",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 45, 114, 4)),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Escolha um plano para continuar usando todos os recursos do GeoForest.",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-              const SizedBox(height: 24),
-              // O restante da UI não precisa de alteração.
-              ...planos.map((plano) => PlanoCard(
-                    plano: plano,
-                    onSelecionar: (priceId) => _iniciarCheckout(priceId),
-                  )).toList(),
-            ],
+          const Text(
+            "Aproveite o Futuro em Análises e Coletas Florestais",
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 45, 114, 4)),
           ),
-          if (_isLoading)
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text("Iniciando pagamento seguro...", style: TextStyle(color: Colors.white, fontSize: 16)),
-                  ],
-                ),
-              ),
-            ),
+          const SizedBox(height: 8),
+          const Text(
+            "Escolha um plano para destravar todos os recursos e continuar crescendo.",
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, color: Colors.black54),
+          ),
+          const SizedBox(height: 24),
+          // Mapeia os planos para o widget PlanoCard, passando a nova função
+          ...planos.map((plano) => PlanoCard(
+                plano: plano,
+                onSelecionar: (planoSelecionado, tipoCobranca) => 
+                    iniciarContatoWhatsApp(planoSelecionado, tipoCobranca),
+              )).toList(),
         ],
       ),
     );
   }
 }
 
-// Widget auxiliar para criar os cards de cada plano
-// NENHUMA ALTERAÇÃO NECESSÁRIA AQUI
+// O Widget do Card agora recebe a função com os parâmetros corretos.
 class PlanoCard extends StatelessWidget {
   final PlanoAssinatura plano;
-  final Function(String priceId) onSelecionar;
+  final Function(PlanoAssinatura plano, String tipoCobranca) onSelecionar;
 
   const PlanoCard({
     super.key,
@@ -238,7 +192,8 @@ class PlanoCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => onSelecionar(plano.precoMensalId),
+                    // Chama a função onSelecionar passando o plano e a string "Mensal"
+                    onPressed: () => onSelecionar(plano, "Mensal"),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       side: BorderSide(color: plano.cor),
@@ -249,7 +204,8 @@ class PlanoCard extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => onSelecionar(plano.precoAnualId),
+                    // Chama a função onSelecionar passando o plano e a string "Anual"
+                    onPressed: () => onSelecionar(plano, "Anual"),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: plano.cor,
                       foregroundColor: Colors.white,

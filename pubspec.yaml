@@ -60,7 +60,7 @@ dependencies:
   simple_animations: ^5.2.0
 
   # Vitrines
-  flutter_stripe: ^10.1.1 # Verifique a versão mais recente no pub.dev
+  # flutter_stripe: ^10.1.1 # Verifique a versão mais recente no pub.dev
   cloud_functions: ^4.7.6
   
   
