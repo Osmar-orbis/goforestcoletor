@@ -1,17 +1,14 @@
 // lib/pages/menu/paywall_page.dart
 
-// Importamos o material.dart normalmente
-import 'package:flutter/material.dart'; 
-// E importamos o flutter_stripe com um "apelido" para evitar o conflito
-import 'package:flutter_stripe/flutter_stripe.dart' as stripe; 
-
+import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+// ADICIONADO: Pacote para abrir a URL de pagamento no navegador.
+import 'package:url_launcher/url_launcher.dart';
 
-
-// Sua chave publicável do Stripe.
-const String stripePublishableKey = "pk_live_51RkZWtCHDKuxFKvWkctCa29ioADWA8XaBx1cown7ePUCYyzCuSrlH8bW9kjDe2WcxbPUE6jQtnu6Vnyk1jNza6od006AkUPbgv";
-
+// O pacote do Stripe não é mais necessário nesta página para a abordagem de Checkout.
+// Se você não o usa em mais nenhum lugar, pode até removê-lo do pubspec.yaml.
+// import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
 
 // Modelo simples para representar um plano
 class PlanoAssinatura {
@@ -52,8 +49,8 @@ class _PaywallPageState extends State<PaywallPage> {
     PlanoAssinatura(
       nome: "Básico",
       descricao: "Para equipes pequenas e projetos iniciais.",
-      precoAnualId: "price_1RldvcCHDKuxFKvWbyrIMf1B", 
-      precoMensalId: "price_1RldvcCHDKuxFKvWFSENoSNg",
+      precoAnualId: "price_1RlrTUCHDKuxFKvWcbK7A5sW",
+      precoMensalId: "price_1RlrTiCHDKuxFKvW2zxUHW1C",
       valorAnual: "R\$ 5.000",
       valorMensal: "R\$ 600",
       icone: Icons.person_outline,
@@ -63,8 +60,8 @@ class _PaywallPageState extends State<PaywallPage> {
     PlanoAssinatura(
       nome: "Profissional",
       descricao: "Ideal para empresas em crescimento.",
-      precoAnualId: "price_1RldvaCHDKuxFKvWyAEb0cad",
-      precoMensalId: "price_1RldvZCHDKuxFKvWCWoQ3jzW",
+      precoAnualId: "price_1RlrUbCHDKuxFKvWc2k3Fw4z",
+      precoMensalId: "price_1RlrUmCHDKuxFKvWtjOZzV46",
       valorAnual: "R\$ 9.000",
       valorMensal: "R\$ 850",
       icone: Icons.business_center_outlined,
@@ -74,102 +71,71 @@ class _PaywallPageState extends State<PaywallPage> {
     PlanoAssinatura(
       nome: "Premium",
       descricao: "A solução completa para grandes operações.",
-      precoAnualId: "price_1RldvVCHDKuxFKvWjxNtR4xC",
-      precoMensalId: "price_1RldvVCHDKuxFKvWiE0MzIDm",
+      precoAnualId: "price_1RlrVRCHDKuxFKvWPlhY6IcP",
+      precoMensalId: "price_1RlrVeCHDKuxFKvWkPymrqi5",
       valorAnual: "R\$ 15.000",
-      valorMensal: "R\$ 1.500",
+      valorMensal: "R\$ 1.700",
       icone: Icons.star_border_outlined,
       cor: Colors.purple,
       features: ["Dispositivos ilimitados", "3 Desktops ", "Todos os Módulos", "Acesso à API", "Gerente de conta dedicado"],
     ),
   ];
 
- Future<void> _iniciarCheckout(String priceId) async {
-  // A inicialização da chave agora é feita no main.dart, 
-  // mas podemos garantir que ela está aqui também.
-  stripe.Stripe.publishableKey = stripePublishableKey;
-  await stripe.Stripe.instance.applySettings();
+  // =========================================================================
+  // MÉTODO _iniciarCheckout COMPLETAMENTE SUBSTITUÍDO PELA VERSÃO SIMPLIFICADA
+  // =========================================================================
+  Future<void> _iniciarCheckout(String priceId) async {
+    setState(() => _isLoading = true);
 
-  setState(() => _isLoading = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception("Usuário não está logado.");
+      }
 
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception("Usuário não está logado.");
-    }
+      // 1. Chama a Cloud Function. Ela fará o trabalho pesado de criar a sessão.
+      //    (Certifique-se de que sua Cloud Function está atualizada para retornar a URL).
+      final functions = FirebaseFunctions.instanceFor(region: "southamerica-east1");
+      final callable = functions.httpsCallable('createCheckoutSession');
+      final response = await callable.call<Map<String, dynamic>>({'priceId': priceId});
 
-    // 1. Chama a Cloud Function para criar a Sessão de Pagamento
-    //    Esta parte continua igual.
-    final functions = FirebaseFunctions.instanceFor(region: "southamerica-east1");
-    final callable = functions.httpsCallable('createCheckoutSession');
-    final response = await callable.call<Map<String, dynamic>>({'priceId': priceId});
+      // 2. A função agora retorna apenas uma URL.
+      final String? url = response.data['url'];
 
-    // 2. Extrai os dados necessários retornados pela função.
-    //    O Stripe agora nos dá várias chaves para configurar a tela de pagamento.
-    final paymentIntentClientSecret = response.data['paymentIntent'];
-    final ephemeralKey = response.data['ephemeralKey'];
-    final customerId = response.data['customer'];
+      if (url != null) {
+        final uri = Uri.parse(url);
+        // 3. Abre a página de pagamento segura do Stripe no navegador do celular.
+        //    O Stripe cuida de todo o resto (cartão, validação, etc).
+        if (await canLaunchUrl(uri)) {
+          // Usar 'externalApplication' garante que abrirá no Chrome/Safari,
+          // o que é mais robusto que uma webview dentro do app.
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          throw 'Não foi possível abrir a página de pagamento.';
+        }
+      } else {
+        // Isso acontece se a Cloud Function falhar e não retornar uma URL.
+        throw 'URL de pagamento inválida recebida do servidor.';
+      }
 
-    if (paymentIntentClientSecret == null || ephemeralKey == null || customerId == null) {
-      throw Exception("Dados de pagamento inválidos retornados pelo servidor.");
-    }
-
-    // 3. Inicializa o "Payment Sheet" (a tela de pagamento nativa)
-    await stripe.Stripe.instance.initPaymentSheet(
-      paymentSheetParameters: stripe.SetupPaymentSheetParameters(
-        // ID do cliente no Stripe
-        customerId: customerId,
-        // Chave temporária para autorizar o app a agir em nome do cliente
-        customerEphemeralKeySecret: ephemeralKey,
-        // "Intenção de pagamento", a chave principal da transação
-        paymentIntentClientSecret: paymentIntentClientSecret,
-        // Nome do seu negócio
-        merchantDisplayName: 'GeoForest Analytics',
-      ),
-    );
-
-    // 4. Apresenta a tela de pagamento para o usuário
-    await stripe.Stripe.instance.presentPaymentSheet();
-    
-    // Se chegar aqui, o pagamento foi bem-sucedido!
-    if(mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Pagamento concluído com sucesso! Atualizando sua licença..."),
-          backgroundColor: Colors.green,
-        ),
-      );
-      // Você pode redirecionar o usuário ou apenas esperar o webhook atualizar o status.
-    }
-
-  } on stripe.StripeException catch (e) {
-    // Lida com erros específicos do Stripe (ex: cartão recusado)
-    if(mounted) {
-       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Erro no pagamento: ${e.error.localizedMessage}"),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  } on FirebaseFunctionsException catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro do Firebase: ${e.message}"), backgroundColor: Colors.red),
-      );
-    }
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro inesperado: ${e.toString()}"), backgroundColor: Colors.red),
-      );
-    }
-  } finally {
-    if (mounted) {
-      setState(() => _isLoading = false);
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erro de comunicação com o servidor: ${e.message}"), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Ocorreu um erro inesperado: ${e.toString()}"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -181,9 +147,9 @@ class _PaywallPageState extends State<PaywallPage> {
             padding: const EdgeInsets.all(16.0),
             children: [
               const Text(
-                "Sua licença de teste expirou!",
+                "Aproveite o Futuro em Análises e Coletas Florestais",
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 45, 114, 4)),
               ),
               const SizedBox(height: 8),
               const Text(
@@ -192,6 +158,7 @@ class _PaywallPageState extends State<PaywallPage> {
                 style: TextStyle(fontSize: 16, color: Colors.black54),
               ),
               const SizedBox(height: 24),
+              // O restante da UI não precisa de alteração.
               ...planos.map((plano) => PlanoCard(
                     plano: plano,
                     onSelecionar: (priceId) => _iniciarCheckout(priceId),
@@ -219,6 +186,7 @@ class _PaywallPageState extends State<PaywallPage> {
 }
 
 // Widget auxiliar para criar os cards de cada plano
+// NENHUMA ALTERAÇÃO NECESSÁRIA AQUI
 class PlanoCard extends StatelessWidget {
   final PlanoAssinatura plano;
   final Function(String priceId) onSelecionar;
@@ -231,8 +199,6 @@ class PlanoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // <<< CORREÇÃO 3: O widget Card agora é explicitamente do material.dart >>>
-    // e o código interno permanece o mesmo
     return Card(
       elevation: 4,
       margin: const EdgeInsets.only(bottom: 20),
