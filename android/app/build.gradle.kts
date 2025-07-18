@@ -1,5 +1,3 @@
-// ARQUIVO: android/app/build.gradle.kts (VERSÃO COM A CORREÇÃO FINAL)
-
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -10,9 +8,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// <<< A CORREÇÃO ESTÁ AQUI >>>
-// O caminho correto é apenas "key.properties", não "android/key.properties"
-val keyPropertiesFile = rootProject.file("key.properties") 
+val keyPropertiesFile = rootProject.file("key.properties")
 val keyProperties = Properties()
 if (keyPropertiesFile.exists()) {
     keyProperties.load(FileInputStream(keyPropertiesFile))
@@ -24,10 +20,12 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = keyProperties.getProperty("keyAlias")
-            keyPassword = keyProperties.getProperty("keyPassword")
-            storeFile = file(keyProperties.getProperty("storeFile"))
-            storePassword = keyProperties.getProperty("storePassword")
+            if (keyPropertiesFile.exists()) {
+                keyAlias = keyProperties.getProperty("keyAlias")
+                keyPassword = keyProperties.getProperty("keyPassword")
+                storeFile = file(keyProperties.getProperty("storeFile") ?: "")
+                storePassword = keyProperties.getProperty("storePassword")
+            }
         }
     }
 
@@ -56,7 +54,6 @@ android {
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
-                        
         }
     }
 }
@@ -66,7 +63,8 @@ flutter {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:${property("kotlinVersion")}")
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("com.google.firebase:firebase-perf-ktx")
+    implementation("com.google.firebase:firebase-analytics")
 }

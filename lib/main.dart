@@ -1,15 +1,16 @@
-// lib/main.dart (VERSÃO FINAL COM LÓGICA DE NAVEGAÇÃO CORRIGIDA)
+// lib/main.dart (VERSÃO FINAL ESTÁVEL COM APP CHECK)
 
 import 'dart:io';
+import 'package:flutter/foundation.dart'; // Import necessário para kDebugMode
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
-// import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:firebase_app_check/firebase_app_check.dart'; // <<< ADICIONADO
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 
-// Importações do Projeto
+// Importações do Projeto (AS SUAS, INTACTAS)
 import 'package:geoforestcoletor/pages/menu/home_page.dart';
 import 'package:geoforestcoletor/pages/menu/login_page.dart';
 import 'package:geoforestcoletor/pages/menu/equipe_page.dart';
@@ -45,20 +46,33 @@ class _AppInitializerState extends State<AppInitializer> {
 
   Future<void> _initializeApp() async {
     // Adiciona um delay artificial para garantir que a splash screen seja visível
-    // por um tempo mínimo, melhorando a experiência do usuário.
     await Future.delayed(const Duration(seconds: 2));
 
+    // A inicialização do Firebase é a primeira coisa a ser feita.
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
-
+    
+    // <<< BLOCO DO APP CHECK ADICIONADO AQUI >>>
+    // Ele é seguro e não vai travar o app.
+    try {
+      const androidProvider = kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity;
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: androidProvider,
+      );
+      print("Firebase App Check ativado com sucesso.");
+    } catch (e) {
+      // Se a ativação falhar, apenas informamos no console e continuamos.
+      print("!!!!!! ERRO AO ATIVAR O FIREBASE APP CHECK: $e !!!!!");
+    }
+    
+    // O resto do seu código de inicialização original
     await SystemChrome.setPreferredOrientations(
       [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown],
     );
 
-   
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
@@ -73,6 +87,7 @@ class _AppInitializerState extends State<AppInitializer> {
 
   @override
   Widget build(BuildContext context) {
+    // SEU WIDGET BUILD ESTÁ INTACTO
     return FutureBuilder(
       future: _initializationFuture,
       builder: (context, snapshot) {
@@ -86,9 +101,6 @@ class _AppInitializerState extends State<AppInitializer> {
           );
         }
 
-        // A MUDANÇA ESTÁ AQUI:
-        // Se a inicialização ainda não terminou, ele mostra a SplashPage.
-        // Quando o Future termina, o FutureBuilder reconstrói e entra no if abaixo.
         if (snapshot.connectionState != ConnectionState.done) {
           return const MaterialApp(
             debugShowCheckedModeBanner: false,
@@ -96,13 +108,13 @@ class _AppInitializerState extends State<AppInitializer> {
           );
         }
 
-        // Se a inicialização estiver concluída com sucesso, mostra o app principal.
         return const MyApp();
       },
     );
   }
 }
 
+// O RESTO DO SEU ARQUIVO, COMPLETAMENTE INTACTO
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -120,7 +132,6 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: _buildThemeData(Brightness.light),
         darkTheme: _buildThemeData(Brightness.dark),
-        // O MyApp agora é o único responsável por suas rotas.
         initialRoute: '/auth_check',
         routes: {
           '/auth_check': (context) => const AuthCheck(),
