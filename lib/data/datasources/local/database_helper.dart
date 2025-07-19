@@ -1,4 +1,4 @@
-// lib/data/datasources/local/database_helper.dart (VERSÃO FINALÍSSIMA COM IMPORTAÇÃO CORRETA)
+// lib/data/datasources/local/database_helper.dart (VERSÃO FINAL COM FUNÇÃO DE SEGURANÇA NO LOGOUT)
 
 import 'dart:convert';
 import 'dart:math';
@@ -656,9 +656,6 @@ class DatabaseHelper {
     );
   }
   
-  // =====================================================================
-  // <<< FUNÇÃO DE IMPORTAÇÃO DE AMOSTRAS CORRIGIDA >>>
-  // =====================================================================
   Future<String> importarColetaDeEquipe(String csvContent, int atividadeIdAlvo) async {
     final db = await database;
     int parcelasProcessadas = 0;
@@ -671,7 +668,6 @@ class DatabaseHelper {
     final headers = rows.first.map((h) => h.toString().trim()).toList();
     final dataRows = rows.sublist(1).map((row) => Map.fromIterables(headers, row)).toList();
 
-    // <<< MUDANÇA CRÍTICA 1: Agrupar as linhas por parcela ANTES de ir ao banco >>>
     final parcelasAgrupadas = groupBy(dataRows, (row) {
         final idFazenda = row['Codigo_Fazenda']?.toString() ?? row['Fazenda']?.toString() ?? 'FAZENDA_PADRAO';
         final nomeTalhao = row['Talhao']?.toString() ?? 'TALHAO_PADRAO';
@@ -691,7 +687,6 @@ class DatabaseHelper {
             final grupoDeLinhas = entry.value;
             final primeiraLinha = grupoDeLinhas.first;
 
-            // --- 1. Encontrar ou criar Fazenda e Talhão ---
             final idFazenda = primeiraLinha['Codigo_Fazenda']?.toString() ?? primeiraLinha['Fazenda']?.toString() ?? 'FAZENDA_PADRAO';
             Fazenda? fazenda = (await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [idFazenda, atividadeIdAlvo])).map((e) => Fazenda.fromMap(e)).firstOrNull;
             if (fazenda == null) {
@@ -716,7 +711,6 @@ class DatabaseHelper {
                 novosTalhoes++;
             }
 
-            // --- 2. Preparar dados da Parcela (com área e coordenadas) ---
             double area = double.tryParse(primeiraLinha['Area_m2']?.toString() ?? '0') ?? 0;
             double? largura = double.tryParse(primeiraLinha['Largura_m']?.toString() ?? '');
             double? comprimento = double.tryParse(primeiraLinha['Comprimento_m']?.toString() ?? '');
@@ -738,7 +732,6 @@ class DatabaseHelper {
                 lon = double.tryParse(primeiraLinha['Longitude']?.toString() ?? '');
             }
 
-            // --- 3. Inserir ou atualizar a Parcela ---
             final idParcelaColeta = primeiraLinha['ID_Coleta_Parcela']?.toString() ?? 'PARCELA_PADRAO';
             Parcela? parcelaExistente = (await txn.query('parcelas', where: 'idParcela = ? AND talhaoId = ?', whereArgs: [idParcelaColeta, talhao.id!])).map((e) => Parcela.fromMap(e)).firstOrNull;
             
@@ -761,7 +754,6 @@ class DatabaseHelper {
             }
             parcelasProcessadas++;
 
-            // --- 4. Inserir TODAS as árvores daquela parcela ---
             for (final linhaArvore in grupoDeLinhas) {
                 final cap = double.tryParse(linhaArvore['CAP_cm']?.toString() ?? '');
                 if (cap != null) {
@@ -1013,4 +1005,28 @@ class DatabaseHelper {
 
   Future<void> deleteSortimento(int id) async =>
       await (await database).delete('sortimentos', where: 'id = ?', whereArgs: [id]);
+      
+  // =====================================================================
+  // <<< NOVA FUNÇÃO DE SEGURANÇA ADICIONADA AQUI >>>
+  // =====================================================================
+  
+  /// DELETA o arquivo físico do banco de dados do dispositivo.
+  /// Usado durante o logout para garantir que nenhum dado de usuário vaze para a próxima sessão.
+  Future<void> deleteDatabaseFile() async {
+    // Fecha a conexão com o banco se ela estiver aberta, para liberar o arquivo.
+    if (_database != null && _database!.isOpen) {
+      await _database!.close();
+      _database = null; // Zera a instância para forçar a recriação no próximo login.
+    }
+    
+    try {
+      final path = join(await getDatabasesPath(), 'geoforestcoletor.db');
+      await deleteDatabase(path);
+      debugPrint("Banco de dados local completamente apagado com sucesso.");
+    } catch (e) {
+      debugPrint("!!!!!! ERRO AO APAGAR O BANCO DE DADOS: $e !!!!!");
+      // Mesmo que falhe, tentamos garantir que a instância seja nula.
+      _database = null;
+    }
+  }
 }

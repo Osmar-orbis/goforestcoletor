@@ -1,11 +1,15 @@
-// lib/controller/login_controller.dart (COPIE E COLE ESTE CÓDIGO COMPLETO)
+// lib/controller/login_controller.dart (VERSÃO CORRIGIDA E SEGURA)
 
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:geoforestcoletor/services/auth_service.dart'; // Importe seu AuthService
+import 'package:geoforestcoletor/services/auth_service.dart';
+// <<< 1. IMPORTE O DATABASE HELPER >>>
+import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
 
 class LoginController with ChangeNotifier {
-  final AuthService _authService = AuthService(); // Instância do seu AuthService
+  final AuthService _authService = AuthService();
+  // <<< 2. CRIE UMA INSTÂNCIA DO HELPER >>>
+  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
 
   // Propriedades para saber o estado do login
   bool _isLoggedIn = false;
@@ -49,8 +53,13 @@ class LoginController with ChangeNotifier {
 
   /// Método para realizar o logout usando o AuthService.
   Future<void> signOut() async {
+    // <<< 3. LIMPE O BANCO DE DADOS ANTES DE DESLOGAR >>>
+    // Este é o passo mais importante para garantir a segurança dos dados.
+    await _dbHelper.deleteDatabaseFile();
+    
+    // Agora, prossiga com o logout do Firebase.
     await _authService.signOut();
-    // Não precisa de `notifyListeners()` aqui, pois o `authStateChanges` 
-    // será acionado automaticamente e fará a notificação.
+    
+    // O `authStateChanges` será acionado automaticamente e fará a notificação.
   }
 }

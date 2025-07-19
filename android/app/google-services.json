@@ -15,32 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCV7PIdgiqCLx2pE5Xj1DNFKZBTh113bX8"
-        },
-        {
-          "current_key": "AIzaSyCee3CMOnmFgnJAl0bbIiIvUVdFQan4Zm4"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:147507206203:android:bab29e97ab90e6a57e241e",
-        "android_client_info": {
-          "package_name": "com.example.geovigilancia"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCV7PIdgiqCLx2pE5Xj1DNFKZBTh113bX8"
-        },
-        {
-          "current_key": "AIzaSyCee3CMOnmFgnJAl0bbIiIvUVdFQan4Zm4"
+          "current_key": "AIzaSyBq17yoPVMW__vZWuHiRVjA8H3OKVaDSVI"
         }
       ],
       "services": {

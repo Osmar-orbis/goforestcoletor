@@ -62,7 +62,7 @@ dependencies:
 
   # Vitrines
   # flutter_stripe: ^10.1.1 # Verifique a versão mais recente no pub.dev
-  cloud_functions: ^4.7.6
+  # cloud_functions: ^4.7.6
   
   
   

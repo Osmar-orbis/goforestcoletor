@@ -1,16 +1,16 @@
-// lib/main.dart (VERSÃO FINAL ESTÁVEL COM APP CHECK)
+// lib/main.dart (VERSÃO FINAL - MODO WHATSAPP)
 
 import 'dart:io';
-import 'package:flutter/foundation.dart'; // Import necessário para kDebugMode
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart'; // <<< ADICIONADO
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 
-// Importações do Projeto (AS SUAS, INTACTAS)
+// Importações do Projeto
 import 'package:geoforestcoletor/pages/menu/home_page.dart';
 import 'package:geoforestcoletor/pages/menu/login_page.dart';
 import 'package:geoforestcoletor/pages/menu/equipe_page.dart';
@@ -22,80 +22,82 @@ import 'package:geoforestcoletor/pages/menu/splash_page.dart';
 import 'package:geoforestcoletor/providers/license_provider.dart';
 import 'package:geoforestcoletor/pages/menu/paywall_page.dart';
 
-
-void main() {
+// PONTO DE ENTRADA PRINCIPAL DO APP
+Future<void> main() async {
+  // Garante que os bindings do Flutter estão prontos
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const AppInitializer());
+
+  // Inicializa o Firebase de forma segura, evitando duplicação
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
+  
+  // Inicia a UI
+  runApp(const AppServicesLoader());
 }
 
-class AppInitializer extends StatefulWidget {
-  const AppInitializer({super.key});
+// Este widget carrega os serviços ADICIONAIS após o Firebase Core já estar pronto.
+class AppServicesLoader extends StatefulWidget {
+  const AppServicesLoader({super.key});
 
   @override
-  State<AppInitializer> createState() => _AppInitializerState();
+  State<AppServicesLoader> createState() => _AppServicesLoaderState();
 }
 
-class _AppInitializerState extends State<AppInitializer> {
-  late Future<void> _initializationFuture;
+class _AppServicesLoaderState extends State<AppServicesLoader> {
+  late Future<void> _servicesInitializationFuture;
 
   @override
   void initState() {
     super.initState();
-    _initializationFuture = _initializeApp();
+    _servicesInitializationFuture = _initializeRemainingServices();
   }
 
-  Future<void> _initializeApp() async {
-    // Adiciona um delay artificial para garantir que a splash screen seja visível
-    await Future.delayed(const Duration(seconds: 2));
-
-    // A inicialização do Firebase é a primeira coisa a ser feita.
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-    }
-    
-    // <<< BLOCO DO APP CHECK ADICIONADO AQUI >>>
-    // Ele é seguro e não vai travar o app.
+  Future<void> _initializeRemainingServices() async {
     try {
-      const androidProvider = kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity;
-      await FirebaseAppCheck.instance.activate(
-        androidProvider: androidProvider,
-      );
-      print("Firebase App Check ativado com sucesso.");
-    } catch (e) {
-      // Se a ativação falhar, apenas informamos no console e continuamos.
-      print("!!!!!! ERRO AO ATIVAR O FIREBASE APP CHECK: $e !!!!!");
-    }
-    
-    // O resto do seu código de inicialização original
-    await SystemChrome.setPreferredOrientations(
-      [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown],
-    );
+      // Adiciona um delay para a splash screen ser visível
+      await Future.delayed(const Duration(seconds: 2));
 
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
+      // Ativa o Firebase App Check
+      const androidProvider = kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity;
+      await FirebaseAppCheck.instance.activate(androidProvider: androidProvider);
+      print("Firebase App Check ativado com sucesso.");
+
+      // Configura a orientação do dispositivo
+      await SystemChrome.setPreferredOrientations(
+        [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown],
+      );
+
+      // Configura o SQFlite para Desktop, se aplicável
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
+    } catch (e) {
+      print("!!!!!! ERRO NA INICIALIZAÇÃO DOS SERVIÇOS: $e !!!!!");
+      // relança o erro para o FutureBuilder poder capturá-lo
+      rethrow;
     }
   }
 
   void _retryInitialization() {
     setState(() {
-      _initializationFuture = _initializeApp();
+      _servicesInitializationFuture = _initializeRemainingServices();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // SEU WIDGET BUILD ESTÁ INTACTO
     return FutureBuilder(
-      future: _initializationFuture,
+      future: _servicesInitializationFuture,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             home: ErrorScreen(
-              message: "Failed to initialize app services:\n${snapshot.error.toString()}",
+              message: "Falha ao inicializar os serviços do aplicativo:\n${snapshot.error.toString()}",
               onRetry: _retryInitialization,
             ),
           );
@@ -114,7 +116,7 @@ class _AppInitializerState extends State<AppInitializer> {
   }
 }
 
-// O RESTO DO SEU ARQUIVO, COMPLETAMENTE INTACTO
+// WIDGET PRINCIPAL DO APLICATIVO (SEM ALTERAÇÕES)
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -146,7 +148,7 @@ class MyApp extends StatelessWidget {
           ErrorWidget.builder = (FlutterErrorDetails details) {
             debugPrint('Caught a Flutter error: ${details.exception}');
             return ErrorScreen(
-              message: 'An unexpected error occurred.\nPlease restart the app.',
+              message: 'Ocorreu um erro inesperado.\nPor favor, reinicie o aplicativo.',
               onRetry: null,
             );
           };
@@ -189,6 +191,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// WIDGET DE VERIFICAÇÃO DE AUTENTICAÇÃO E LICENÇA (SEM ALTERAÇÕES)
 class AuthCheck extends StatelessWidget {
   const AuthCheck({super.key});
 
@@ -211,6 +214,7 @@ class AuthCheck extends StatelessWidget {
   }
 }
 
+// TELA DE ERRO GENÉRICA (SEM ALTERAÇÕES)
 class ErrorScreen extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
@@ -229,7 +233,7 @@ class ErrorScreen extends StatelessWidget {
             children: [
               Icon(Icons.error_outline, color: Colors.red[700], size: 60),
               const SizedBox(height: 20),
-              Text('Application Error', style: TextStyle(color: Colors.red[700], fontSize: 24, fontWeight: FontWeight.bold)),
+              Text('Erro na Aplicação', style: TextStyle(color: Colors.red[700], fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
               Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 30),
@@ -237,7 +241,7 @@ class ErrorScreen extends StatelessWidget {
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF617359), foregroundColor: Colors.white),
                   onPressed: onRetry,
-                  child: const Text('Try Again'),
+                  child: const Text('Tentar Novamente'),
                 ),
             ],
           ),

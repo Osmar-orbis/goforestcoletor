@@ -1,15 +1,13 @@
-// ARQUIVO: lib/pages/menu/paywall_page.dart (VERSÃO COMPLETA E CORRIGIDA)
+// lib/pages/menu/paywall_page.dart (VERSÃO FINAL - MODO WHATSAPP)
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// Modelo para representar um plano. Não precisa de alteração.
+// Modelo para representar um plano.
 class PlanoAssinatura {
   final String nome;
   final String descricao;
-  final String precoAnualId;
-  final String precoMensalId;
   final String valorAnual;
   final String valorMensal;
   final IconData icone;
@@ -19,8 +17,6 @@ class PlanoAssinatura {
   PlanoAssinatura({
     required this.nome,
     required this.descricao,
-    required this.precoAnualId,
-    required this.precoMensalId,
     required this.valorAnual,
     required this.valorMensal,
     required this.icone,
@@ -37,14 +33,11 @@ class PaywallPage extends StatefulWidget {
 }
 
 class _PaywallPageState extends State<PaywallPage> {
-  // A lista de planos permanece a mesma, para exibir o catálogo.
-  // Os IDs de preço do Stripe não são mais usados, mas podemos mantê-los por enquanto.
+  // Lista de planos para exibir no catálogo.
   final List<PlanoAssinatura> planos = [
     PlanoAssinatura(
       nome: "Básico",
       descricao: "Para equipes pequenas e projetos iniciais.",
-      precoAnualId: "price_1RlrTUCHDKuxFKvWcbK7A5sW",
-      precoMensalId: "price_1RlrTiCHDKuxFKvW2zxUHW1C",
       valorAnual: "R\$ 5.000",
       valorMensal: "R\$ 600",
       icone: Icons.person_outline,
@@ -54,8 +47,6 @@ class _PaywallPageState extends State<PaywallPage> {
     PlanoAssinatura(
       nome: "Profissional",
       descricao: "Ideal para empresas em crescimento.",
-      precoAnualId: "price_1RlrUbCHDKuxFKvWc2k3Fw4z",
-      precoMensalId: "price_1RlrUmCHDKuxFKvWtjOZzV46",
       valorAnual: "R\$ 9.000",
       valorMensal: "R\$ 850",
       icone: Icons.business_center_outlined,
@@ -65,8 +56,6 @@ class _PaywallPageState extends State<PaywallPage> {
     PlanoAssinatura(
       nome: "Premium",
       descricao: "A solução completa para grandes operações.",
-      precoAnualId: "price_1RlrVRCHDKuxFKvWPlhY6IcP",
-      precoMensalId: "price_1RlrVeCHDKuxFKvWkPymrqi5",
       valorAnual: "R\$ 15.000",
       valorMensal: "R\$ 1.700",
       icone: Icons.star_border_outlined,
@@ -93,14 +82,12 @@ class _PaywallPageState extends State<PaywallPage> {
     final String nomePlano = plano.nome;
     final String emailUsuario = user.email ?? "Email não disponível";
 
-    final String mensagem = "Olá! Tenho interesse em contratar o *$nomePlano ($tipoCobranca)* para o GeoForest Analytics. Meu email de cadastro é: $emailUsuario";
+    final String mensagem = "Olá! Tenho interesse em contratar o plano *$nomePlano ($tipoCobranca)* para o GeoForest Analytics. Meu email de cadastro é: $emailUsuario";
     
-    final String urlWhatsApp = "https://wa.me/$seuNumeroWhatsApp?text=${Uri.encodeComponent(mensagem)}";
+    final String urlWhatsApp = "https://wa.me/$seuNumeroWhatsApp?text=${Uri.encodeComponent(mensagem )}";
     final Uri uri = Uri.parse(urlWhatsApp);
 
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Não foi possível abrir o WhatsApp. Certifique-se de que ele está instalado."))
@@ -113,7 +100,7 @@ class _PaywallPageState extends State<PaywallPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Escolha seu Plano"), centerTitle: true),
-      body: ListView( // Simplificado, removido o Stack pois _isLoading não é mais necessário
+      body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
           const Text(
@@ -128,7 +115,7 @@ class _PaywallPageState extends State<PaywallPage> {
             style: TextStyle(fontSize: 16, color: Colors.black54),
           ),
           const SizedBox(height: 24),
-          // Mapeia os planos para o widget PlanoCard, passando a nova função
+          // Mapeia os planos para o widget PlanoCard, passando a função de contato
           ...planos.map((plano) => PlanoCard(
                 plano: plano,
                 onSelecionar: (planoSelecionado, tipoCobranca) => 
@@ -140,7 +127,7 @@ class _PaywallPageState extends State<PaywallPage> {
   }
 }
 
-// O Widget do Card agora recebe a função com os parâmetros corretos.
+// Widget do Card, agora recebe a função com os parâmetros corretos.
 class PlanoCard extends StatelessWidget {
   final PlanoAssinatura plano;
   final Function(PlanoAssinatura plano, String tipoCobranca) onSelecionar;
@@ -192,7 +179,6 @@ class PlanoCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    // Chama a função onSelecionar passando o plano e a string "Mensal"
                     onPressed: () => onSelecionar(plano, "Mensal"),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -204,7 +190,6 @@ class PlanoCard extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
-                    // Chama a função onSelecionar passando o plano e a string "Anual"
                     onPressed: () => onSelecionar(plano, "Anual"),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: plano.cor,
