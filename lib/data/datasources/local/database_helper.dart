@@ -1,4 +1,4 @@
-// lib/data/datasources/local/database_helper.dart (VERSÃO FINAL COM FUNÇÃO DE SEGURANÇA NO LOGOUT)
+// lib/data/datasources/local/database_helper.dart (VERSÃO AJUSTADA E ROBUSTA)
 
 import 'dart:convert';
 import 'dart:math';
@@ -662,7 +662,23 @@ class DatabaseHelper {
     int arvoresImportadas = 0;
     int novasFazendas = 0;
     int novosTalhoes = 0;
-    final List<List<dynamic>> rows = const CsvToListConverter(fieldDelimiter: ',', eol: '\n').convert(csvContent);
+    
+    // ===== INÍCIO DA LÓGICA DE DETECÇÃO AUTOMÁTICA =====
+    if (csvContent.isEmpty) return "Erro: O arquivo CSV está vazio.";
+
+    final firstLine = csvContent.split('\n').first;
+    final commaCount = ','.allMatches(firstLine).length;
+    final semicolonCount = ';'.allMatches(firstLine).length;
+
+    String detectedDelimiter = ',';
+    if (semicolonCount > commaCount) {
+      detectedDelimiter = ';';
+    }
+    
+    debugPrint("Separador de coluna detectado: '$detectedDelimiter'");
+    // ===== FIM DA LÓGICA DE DETECÇÃO AUTOMÁTICA =====
+
+    final List<List<dynamic>> rows = CsvToListConverter(fieldDelimiter: detectedDelimiter, eol: '\n').convert(csvContent);
     if (rows.length < 2) return "Erro: O arquivo CSV está vazio ou contém apenas o cabeçalho.";
     
     final headers = rows.first.map((h) => h.toString().trim()).toList();
@@ -702,7 +718,7 @@ class DatabaseHelper {
                     fazendaId: fazenda.id, 
                     fazendaAtividadeId: fazenda.atividadeId, 
                     nome: nomeTalhao,
-                    areaHa: double.tryParse(primeiraLinha['Area_ha_Talhao']?.toString() ?? ''),
+                    areaHa: double.tryParse(primeiraLinha['Area_ha_Talhao']?.toString().replaceAll(',', '.') ?? ''),
                     especie: primeiraLinha['Especie_Talhao']?.toString(),
                     espacamento: primeiraLinha['Espacamento_Talhao']?.toString(),
                 );
@@ -711,25 +727,26 @@ class DatabaseHelper {
                 novosTalhoes++;
             }
 
-            double area = double.tryParse(primeiraLinha['Area_m2']?.toString() ?? '0') ?? 0;
-            double? largura = double.tryParse(primeiraLinha['Largura_m']?.toString() ?? '');
-            double? comprimento = double.tryParse(primeiraLinha['Comprimento_m']?.toString() ?? '');
-            double? raio = double.tryParse(primeiraLinha['Raio_m']?.toString() ?? '');
+            // ===== AJUSTE PARA NÚMEROS GRANDES E DECIMAIS =====
+            double area = double.tryParse(primeiraLinha['Area_m2']?.toString().replaceAll('.', '').replaceAll(',', '.') ?? '0') ?? 0;
+            double? largura = double.tryParse(primeiraLinha['Largura_m']?.toString().replaceAll(',', '.') ?? '');
+            double? comprimento = double.tryParse(primeiraLinha['Comprimento_m']?.toString().replaceAll(',', '.') ?? '');
+            double? raio = double.tryParse(primeiraLinha['Raio_m']?.toString().replaceAll(',', '.') ?? '');
             if (area <= 0) {
                 if (largura != null && comprimento != null) area = largura * comprimento;
                 else if (raio != null) area = pi * raio * raio;
             }
 
             double? lat, lon;
-            final easting = double.tryParse(primeiraLinha['Easting']?.toString() ?? '');
-            final northing = double.tryParse(primeiraLinha['Northing']?.toString() ?? '');
+            final easting = double.tryParse(primeiraLinha['Easting']?.toString().replaceAll(',', '.') ?? '');
+            final northing = double.tryParse(primeiraLinha['Northing']?.toString().replaceAll(',', '.') ?? '');
             if(easting != null && northing != null) {
                 final pontoWGS84 = projUTM.transform(projWGS84, proj4.Point(x: easting, y: northing));
                 lat = pontoWGS84.y;
                 lon = pontoWGS84.x;
             } else {
-                lat = double.tryParse(primeiraLinha['Latitude']?.toString() ?? '');
-                lon = double.tryParse(primeiraLinha['Longitude']?.toString() ?? '');
+                lat = double.tryParse(primeiraLinha['Latitude']?.toString().replaceAll(',', '.') ?? '');
+                lon = double.tryParse(primeiraLinha['Longitude']?.toString().replaceAll(',', '.') ?? '');
             }
 
             final idParcelaColeta = primeiraLinha['ID_Coleta_Parcela']?.toString() ?? 'PARCELA_PADRAO';
@@ -755,11 +772,12 @@ class DatabaseHelper {
             parcelasProcessadas++;
 
             for (final linhaArvore in grupoDeLinhas) {
-                final cap = double.tryParse(linhaArvore['CAP_cm']?.toString() ?? '');
+                // ===== AJUSTE PARA NÚMEROS DECIMAIS (CAP e Altura) =====
+                final cap = double.tryParse(linhaArvore['CAP_cm']?.toString().replaceAll(',', '.') ?? '');
                 if (cap != null) {
                     final novaArvore = Arvore(
                         cap: cap,
-                        altura: double.tryParse(linhaArvore['Altura_m']?.toString() ?? ''),
+                        altura: double.tryParse(linhaArvore['Altura_m']?.toString().replaceAll(',', '.') ?? ''),
                         linha: int.tryParse(linhaArvore['Linha']?.toString() ?? '0') ?? 0,
                         posicaoNaLinha: int.tryParse(linhaArvore['Posicao_na_Linha']?.toString() ?? '0') ?? 0,
                         dominante: linhaArvore['Dominante']?.toString().toLowerCase() == 'sim',
@@ -886,7 +904,22 @@ class DatabaseHelper {
     int novasFazendas = 0;
     int novosTalhoes = 0;
 
-    final List<List<dynamic>> rows = const CsvToListConverter(fieldDelimiter: ',', eol: '\n').convert(csvContent);
+    // ===== INÍCIO DA LÓGICA DE DETECÇÃO AUTOMÁTICA =====
+    if (csvContent.isEmpty) return "Erro: O arquivo CSV está vazio.";
+
+    final firstLine = csvContent.split('\n').first;
+    final commaCount = ','.allMatches(firstLine).length;
+    final semicolonCount = ';'.allMatches(firstLine).length;
+
+    String detectedDelimiter = ',';
+    if (semicolonCount > commaCount) {
+      detectedDelimiter = ';';
+    }
+    
+    debugPrint("Separador de cubagem detectado: '$detectedDelimiter'");
+    // ===== FIM DA LÓGICA DE DETECÇÃO AUTOMÁTICA =====
+
+    final List<List<dynamic>> rows = CsvToListConverter(fieldDelimiter: detectedDelimiter, eol: '\n').convert(csvContent);
     if (rows.length < 2) return "Erro: Arquivo CSV vazio ou com apenas cabeçalho.";
 
     final headers = rows.first.map((h) => h.toString().trim()).toList();
@@ -960,10 +993,11 @@ class DatabaseHelper {
             nomeTalhao: nomeTalhao,
             identificador: dadosPrimeiraLinha['identificador_arvore'].toString(),
             classe: dadosPrimeiraLinha['classe']?.toString(),
-            alturaTotal: double.tryParse(dadosPrimeiraLinha['altura_total_m']?.toString() ?? '0') ?? 0,
+            // ===== AJUSTE PARA NÚMEROS DECIMAIS =====
+            alturaTotal: double.tryParse(dadosPrimeiraLinha['altura_total_m']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
             tipoMedidaCAP: dadosPrimeiraLinha['tipo_medida_cap']?.toString() ?? 'fita',
-            valorCAP: double.tryParse(dadosPrimeiraLinha['valor_cap']?.toString() ?? '0') ?? 0,
-            alturaBase: double.tryParse(dadosPrimeiraLinha['altura_base_m']?.toString() ?? '0') ?? 0,
+            valorCAP: double.tryParse(dadosPrimeiraLinha['valor_cap']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
+            alturaBase: double.tryParse(dadosPrimeiraLinha['altura_base_m']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
           );
           final arvoreCubagemId = await txn.insert('cubagens_arvores', arvoreCubagem.toMap());
           arvoresImportadas++;
@@ -971,10 +1005,11 @@ class DatabaseHelper {
           for (final rowMap in entry.value) {
             final secao = CubagemSecao(
               cubagemArvoreId: arvoreCubagemId,
-              alturaMedicao: double.tryParse(rowMap['altura_medicao_secao_m']?.toString() ?? '0') ?? 0,
-              circunferencia: double.tryParse(rowMap['circunferencia_secao_cm']?.toString() ?? '0') ?? 0,
-              casca1_mm: double.tryParse(rowMap['casca1_mm']?.toString() ?? '0') ?? 0,
-              casca2_mm: double.tryParse(rowMap['casca2_mm']?.toString() ?? '0') ?? 0,
+              // ===== AJUSTE PARA NÚMEROS DECIMAIS =====
+              alturaMedicao: double.tryParse(rowMap['altura_medicao_secao_m']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
+              circunferencia: double.tryParse(rowMap['circunferencia_secao_cm']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
+              casca1_mm: double.tryParse(rowMap['casca1_mm']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
+              casca2_mm: double.tryParse(rowMap['casca2_mm']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
             );
             if (secao.alturaMedicao > 0) {
               await txn.insert('cubagens_secoes', secao.toMap());

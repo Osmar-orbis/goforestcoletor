@@ -7,7 +7,8 @@ import 'package:geoforestcoletor/models/arvore_model.dart';
 enum StatusParcela {
   pendente(Icons.pending_outlined, Colors.grey),
   emAndamento(Icons.edit_note_outlined, Colors.orange),
-  concluida(Icons.check_circle_outline, Colors.green);
+  concluida(Icons.check_circle_outline, Colors.green),
+  exportada(Icons.cloud_done_outlined, Colors.blue);
 
   final IconData icone;
   final Color cor;

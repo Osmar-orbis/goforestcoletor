@@ -1,4 +1,4 @@
-// lib/pages/talhoes/detalhes_talhao_page.dart
+// lib/pages/talhoes/detalhes_talhao_page.dart (VERSÃO COM STATUS EXPORTADO)
 
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/models/cubagem_arvore_model.dart';
@@ -145,18 +145,13 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
   }
   
   Future<void> _navegarParaDetalhesCubagem(CubagemArvore arvore) async {
-    // =======================================================
-    // <<< CORREÇÃO PRINCIPAL APLICADA AQUI >>>
-    // O método de cubagem ('Fixas' ou 'Relativas') vem do objeto Atividade.
-    // Usamos um fallback para 'Fixas' caso a atividade não tenha o método definido (versões antigas do DB).
-    // =======================================================
     final metodoCorreto = widget.atividade.metodoCubagem ?? 'Fixas';
 
     final resultado = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CubagemDadosPage(
-          metodo: metodoCorreto, // Passa o método correto da atividade
+          metodo: metodoCorreto,
           arvoreParaEditar: arvore,
         ),
       ),
@@ -235,6 +230,20 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
         ),
       ],
     );
+  }
+
+  // ===== MUDANÇA 1: ADICIONAR O NOVO CASO "EXPORTADA" NA FUNÇÃO DE TRADUÇÃO =====
+  String _traduzirStatus(StatusParcela status) {
+    switch (status) {
+      case StatusParcela.pendente:
+        return 'Pendente';
+      case StatusParcela.emAndamento:
+        return 'Em Andamento';
+      case StatusParcela.concluida:
+        return 'Concluída';
+      case StatusParcela.exportada:
+        return 'Exportada';
+    }
   }
 
   @override
@@ -327,18 +336,28 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
         final parcela = parcelas[index];
         final isSelected = _selectedItens.contains(parcela.dbId!);
         final dataFormatada = DateFormat('dd/MM/yyyy HH:mm').format(parcela.dataColeta!);
+        
+        // ===== MUDANÇA 2: ADICIONAR LÓGICA PARA DEFINIR O STATUS FINAL =====
+        final bool foiExportada = parcela.exportada;
+        final StatusParcela statusFinal = foiExportada ? StatusParcela.exportada : parcela.status;
+        final Color corFinal = foiExportada ? StatusParcela.exportada.cor : parcela.status.cor;
+        final IconData iconeFinal = foiExportada ? StatusParcela.exportada.icone : parcela.status.icone;
+
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           color: isSelected ? Theme.of(context).colorScheme.primaryContainer.withAlpha(128) : null,
           child: ListTile(
             onTap: () => _isSelectionMode ? _onItemSelected(parcela.dbId!) : _navegarParaDetalhesParcela(parcela),
             onLongPress: () => _toggleSelectionMode(parcela.dbId!),
+
+            // ===== MUDANÇA 3: USAR AS VARIÁVEIS FINAIS NA INTERFACE =====
             leading: CircleAvatar(
-              backgroundColor: isSelected ? Theme.of(context).colorScheme.primary : parcela.status.cor,
-              child: Icon(isSelected ? Icons.check : parcela.status.icone, color: Colors.white),
+              backgroundColor: isSelected ? Theme.of(context).colorScheme.primary : corFinal,
+              child: Icon(isSelected ? Icons.check : iconeFinal, color: Colors.white),
             ),
             title: Text('Parcela ID: ${parcela.idParcela}', style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('Coletado em: $dataFormatada'),
+            subtitle: Text('Status: ${_traduzirStatus(statusFinal)}\nColetado em: $dataFormatada'),
+            
             trailing: _isSelectionMode
                 ? null
                 : IconButton(

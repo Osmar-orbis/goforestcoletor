@@ -1,4 +1,4 @@
-// lib/providers/map_provider.dart (VERSÃO COM CAPTURA DE ERRO)
+// lib/providers/map_provider.dart (VERSÃO COMPLETA E CORRIGIDA)
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -133,7 +133,6 @@ class MapProvider with ChangeNotifier {
     _currentAtividade = atividade;
   }
   
-  // <<< FUNÇÃO PRINCIPAL MODIFICADA PARA CAPTURAR ERROS >>>
   Future<String> processarImportacaoDeArquivo({required bool isPlanoDeAmostragem}) async {
     if (_currentAtividade == null) {
       return "Erro: Nenhuma atividade selecionada para o planejamento.";
@@ -153,24 +152,16 @@ class MapProvider with ChangeNotifier {
         }
       }
       
-      // Se chegou aqui, o seletor de arquivo foi cancelado ou o arquivo estava vazio.
       return "Nenhum dado válido foi encontrado no arquivo selecionado.";
     
     } on GeoJsonParseException catch (e) {
-      // Captura o erro específico do nosso serviço e retorna a mensagem detalhada.
       return e.toString();
     } catch (e) {
-      // Captura qualquer outro erro inesperado.
       return 'Ocorreu um erro inesperado: ${e.toString()}';
     } finally {
-      // Garante que o loading sempre seja desativado.
       _setLoading(false);
     }
   }
-
-
-  // O restante do arquivo continua igual...
-  // ... (Cole o resto do seu código do MapProvider aqui, sem alterações)
   
   Future<String> _processarCargaDeTalhoesImportada(List<ImportedPolygonFeature> features) async {
     _importedPolygons = []; 
@@ -379,10 +370,13 @@ class MapProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // ===== ARQUIVO CORRIGIDO AQUI =====
   SampleStatus _getSampleStatus(Parcela parcela) {
+    // A propriedade 'exportada' tem prioridade máxima.
     if (parcela.exportada) {
       return SampleStatus.exported;
     }
+    // Se não foi exportada, verificamos os outros status.
     switch (parcela.status) {
       case StatusParcela.concluida:
         return SampleStatus.completed;
@@ -390,6 +384,10 @@ class MapProvider with ChangeNotifier {
         return SampleStatus.open;
       case StatusParcela.pendente:
         return SampleStatus.untouched;
+      // Adicionamos o caso 'exportada' aqui para o switch ser "exaustivo" e
+      // evitar o erro de análise. A lógica principal já foi tratada pelo 'if' acima.
+      case StatusParcela.exportada:
+        return SampleStatus.exported;
     }
   }
 

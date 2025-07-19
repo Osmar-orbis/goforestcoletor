@@ -1,4 +1,4 @@
-// lib/pages/menu/home_page.dart (VERSÃO AJUSTADA COM CONTROLE DE ACESSO)
+// lib/pages/menu/home_page.dart (VERSÃO COMPLETA E CORRIGIDA)
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,9 +10,12 @@ import 'package:geoforestcoletor/pages/projetos/lista_projetos_page.dart';
 import 'package:geoforestcoletor/pages/planejamento/selecao_atividade_mapa_page.dart';
 import 'package:geoforestcoletor/pages/menu/paywall_page.dart';
 import 'package:geoforestcoletor/providers/map_provider.dart';
-import 'package:geoforestcoletor/providers/license_provider.dart'; // <<< IMPORT NECESSÁRIO
+import 'package:geoforestcoletor/providers/license_provider.dart';
 import 'package:geoforestcoletor/services/export_service.dart';
 import 'package:geoforestcoletor/widgets/menu_card.dart';
+
+// Importação necessária para a nova funcionalidade de sincronização
+import 'package:geoforestcoletor/services/sync_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.title});
@@ -23,10 +26,45 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // Estado para controlar o loading da sincronização
+  bool _isSyncing = false;
+
+  // Função para chamar o serviço de sincronização
+  Future<void> _executarSincronizacao() async {
+    if (_isSyncing) return; // Evita múltiplos cliques
+
+    setState(() => _isSyncing = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Iniciando sincronização...'), duration: Duration(seconds: 15)),
+    );
+
+    try {
+      final syncService = SyncService();
+      await syncService.sincronizarDados();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Dados sincronizados com sucesso!'), backgroundColor: Colors.green),
+        );
+      }
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro na sincronização: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
+  }
+
   // O conteúdo de _mostrarDialogoImportacao, _abrirAnalistaDeDados,
   // e _mostrarDialogoExportacao permanece EXATAMENTE O MESMO.
-  // Não é necessário alterá-los.
-
   void _mostrarDialogoImportacao(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -191,15 +229,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
-  // <<<< FUNÇÃO AUXILIAR ADICIONADA >>>>
-  // Mostra um diálogo para o usuário fazer upgrade do plano.
   void _mostrarAvisoDeUpgrade(BuildContext context, String featureName) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Funcionalidade indisponível"),
-        content: Text("A função '$featureName' não está disponível no seu plano atual (Trial). Faça upgrade para desbloqueá-la."),
+        content: Text("A função '$featureName' não está disponível no seu plano atual. Faça upgrade para desbloqueá-la."),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -219,11 +254,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // <<< AJUSTE PRINCIPAL AQUI >>>
-    // 1. Ouve as mudanças do LicenseProvider
     final licenseProvider = context.watch<LicenseProvider>();
-
-    // 2. Determina as permissões com base nos dados carregados, com um valor padrão seguro
     final bool podeExportar = licenseProvider.licenseData?.features['exportacao'] ?? false;
     final bool podeAnalisar = licenseProvider.licenseData?.features['analise'] ?? false;
 
@@ -258,8 +289,6 @@ class _HomePageState extends State<HomePage> {
                             const SelecaoAtividadeMapaPage()));
               },
             ),
-
-            // 3. Lógica aplicada ao card de Análise
             MenuCard(
               icon: Icons.insights_outlined,
               label: 'GeoForest Analista',
@@ -267,14 +296,11 @@ class _HomePageState extends State<HomePage> {
                   ? () => _abrirAnalistaDeDados(context)
                   : () => _mostrarAvisoDeUpgrade(context, "GeoForest Analista"),
             ),
-
             MenuCard(
               icon: Icons.download_for_offline_outlined,
               label: 'Importar Dados (CSV)',
               onTap: () => _mostrarDialogoImportacao(context),
             ),
-
-            // 4. Lógica aplicada ao card de Exportação
             MenuCard(
               icon: Icons.upload_file_outlined,
               label: 'Exportar Dados',
@@ -282,7 +308,6 @@ class _HomePageState extends State<HomePage> {
                   ? () => _mostrarDialogoExportacao(context)
                   : () => _mostrarAvisoDeUpgrade(context, "Exportar Dados"),
             ),
-
             MenuCard(
               icon: Icons.settings_outlined,
               label: 'Configurações',
@@ -293,11 +318,17 @@ class _HomePageState extends State<HomePage> {
             ),
             MenuCard(
               icon: Icons.credit_card,
-              label: 'Assinaturas', // Nome mais claro para o usuário
+              label: 'Assinaturas',
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const PaywallPage()),
               ),
+            ),
+            // Card de Sincronização
+            MenuCard(
+              icon: _isSyncing ? Icons.downloading_outlined : Icons.sync_outlined,
+              label: _isSyncing ? 'Sincronizando...' : 'Sincronizar Dados',
+              onTap: _isSyncing ? () {} : _executarSincronizacao, // Ação do botão
             ),
           ],
         ),
