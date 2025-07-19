@@ -1,4 +1,4 @@
-// lib/providers/map_provider.dart (VERSÃO COMPLETA E CORRIGIDA)
+// lib/providers/map_provider.dart (VERSÃO COM O NOVO FLUXO DE DESENHO)
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -44,7 +44,7 @@ class MapProvider with ChangeNotifier {
     _optimizerService = ActivityOptimizerService(dbHelper: _dbHelper);
   }
 
-  // Getters
+  // Getters (sem alterações)
   bool get isDrawing => _isDrawing;
   List<LatLng> get drawnPoints => _drawnPoints;
   List<Polygon> get polygons => _importedPolygons.map((f) => f.polygon).toList();
@@ -55,6 +55,7 @@ class MapProvider with ChangeNotifier {
   Position? get currentUserPosition => _currentUserPosition;
   bool get isFollowingUser => _isFollowingUser;
 
+  // Lógica de URL do mapa (sem alterações)
   final Map<MapLayerType, String> _tileUrls = {
     MapLayerType.ruas: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     MapLayerType.satelite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -76,6 +77,7 @@ class MapProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // Funções de controle do desenho (sem alterações na assinatura)
   void startDrawing() {
     if (!_isDrawing) {
       _isDrawing = true;
@@ -106,20 +108,216 @@ class MapProvider with ChangeNotifier {
     }
   }
   
-  void saveDrawnPolygon() {
-    if (_drawnPoints.length < 3) {
+  // =======================================================================
+  // <<< INÍCIO DAS MUDANÇAS >>>
+  // =======================================================================
+
+  /// Salva o polígono desenhado após coletar os dados do usuário via formulário.
+  Future<void> saveDrawnPolygon(BuildContext context) async {
+    if (_drawnPoints.length < 3 || _currentAtividade == null) {
       cancelDrawing();
       return;
     }
-    _importedPolygons.add(ImportedPolygonFeature(
-      polygon: Polygon(points: List.from(_drawnPoints), color: const Color(0xFF617359).withAlpha(128), borderColor: const Color(0xFF1D4433), borderStrokeWidth: 2, isFilled: true),
-      properties: {},
-    ));
-    _isDrawing = false;
-    _drawnPoints.clear();
-    notifyListeners();
+  
+    final Map<String, String>? dadosDoFormulario = await _showDadosAmostragemDialog(context);
+  
+    if (dadosDoFormulario == null || !context.mounted) {
+      // Usuário cancelou, então apenas cancelamos o modo de desenho
+      cancelDrawing();
+      return;
+    }
+  
+    _setLoading(true);
+  
+    try {
+      final nomeFazenda = dadosDoFormulario['nomeFazenda']!;
+      final codigoFazenda = dadosDoFormulario['codigoFazenda']!;
+      final nomeTalhao = dadosDoFormulario['nomeTalhao']!;
+      final hectaresPorAmostra = double.parse(dadosDoFormulario['hectares']!);
+  
+      final talhaoSalvo = await _dbHelper.database.then((db) async {
+        return await db.transaction((txn) async {
+          final idFazenda = codigoFazenda.isNotEmpty ? codigoFazenda : nomeFazenda;
+  
+          Fazenda? fazenda = (await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [idFazenda, _currentAtividade!.id!])).map((e) => Fazenda.fromMap(e)).firstOrNull;
+          if (fazenda == null) {
+            fazenda = Fazenda(id: idFazenda, atividadeId: _currentAtividade!.id!, nome: nomeFazenda, municipio: 'N/I', estado: 'N/I');
+            await txn.insert('fazendas', fazenda.toMap());
+          }
+  
+          final novoTalhao = Talhao(
+            fazendaId: fazenda.id,
+            fazendaAtividadeId: fazenda.atividadeId,
+            nome: nomeTalhao,
+          );
+          final talhaoId = await txn.insert('talhoes', novoTalhao.toMap());
+          return novoTalhao.copyWith(id: talhaoId, fazendaNome: fazenda.nome);
+        });
+      });
+  
+      final newFeature = ImportedPolygonFeature(
+        polygon: Polygon(points: List.from(_drawnPoints), color: const Color(0xFF617359).withAlpha(128), borderColor: const Color(0xFF1D4433), borderStrokeWidth: 2, isFilled: true),
+        properties: {
+          'db_talhao_id': talhaoSalvo.id,
+          'db_fazenda_nome': talhaoSalvo.fazendaNome,
+          'fazenda_id': talhaoSalvo.fazendaId,
+          'talhao_nome': talhaoSalvo.nome,
+        },
+      );
+      _importedPolygons.add(newFeature);
+  
+      // Chamar a geração de amostras apenas para o novo polígono
+      await gerarAmostrasParaAtividade(
+        hectaresPerSample: hectaresPorAmostra,
+        featuresParaProcessar: [newFeature],
+      );
+  
+      _isDrawing = false;
+      _drawnPoints.clear();
+
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar e gerar amostras: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      _setLoading(false);
+    }
   }
 
+  /// Exibe o formulário para o usuário preencher os dados da área desenhada.
+  Future<Map<String, String>?> _showDadosAmostragemDialog(BuildContext context) {
+    final formKey = GlobalKey<FormState>();
+    final nomeFazendaController = TextEditingController();
+    final codigoFazendaController = TextEditingController();
+    final nomeTalhaoController = TextEditingController();
+    final hectaresController = TextEditingController();
+  
+    return showDialog<Map<String, String>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Dados da Amostragem'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nomeFazendaController,
+                    decoration: const InputDecoration(labelText: 'Nome da Fazenda'),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Campo obrigatório' : null,
+                  ),
+                  TextFormField(
+                    controller: codigoFazendaController,
+                    decoration: const InputDecoration(labelText: 'Código da Fazenda (Opcional)'),
+                  ),
+                  TextFormField(
+                    controller: nomeTalhaoController,
+                    decoration: const InputDecoration(labelText: 'Nome do Talhão'),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Campo obrigatório' : null,
+                  ),
+                  TextFormField(
+                    controller: hectaresController,
+                    decoration: const InputDecoration(labelText: 'Hectares por amostra', suffixText: 'ha'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Campo obrigatório' : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(context, {
+                    'nomeFazenda': nomeFazendaController.text.trim(),
+                    'codigoFazenda': codigoFazendaController.text.trim(),
+                    'nomeTalhao': nomeTalhaoController.text.trim(),
+                    'hectares': hectaresController.text.replaceAll(',', '.'),
+                  });
+                }
+              },
+              child: const Text('Gerar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // Função de gerar amostras agora é mais flexível
+  Future<String> gerarAmostrasParaAtividade({
+    required double hectaresPerSample,
+    List<ImportedPolygonFeature>? featuresParaProcessar,
+  }) async {
+    final poligonos = featuresParaProcessar ?? _importedPolygons;
+    if (poligonos.isEmpty) return "Nenhum polígono de talhão carregado.";
+    // ... O resto da função continua exatamente como estava
+    if (_currentAtividade == null) return "Erro: Atividade atual não definida.";
+
+    _setLoading(true);
+
+    final pontosGerados = _samplingService.generateMultiTalhaoSamplePoints(
+      importedFeatures: poligonos,
+      hectaresPerSample: hectaresPerSample,
+    );
+
+    if (pontosGerados.isEmpty) {
+      _setLoading(false);
+      return "Nenhum ponto de amostra pôde ser gerado.";
+    }
+
+    final List<Parcela> parcelasParaSalvar = [];
+    int pointIdCounter = 1;
+
+    for (final ponto in pontosGerados) {
+      final props = ponto.properties;
+      final talhaoIdSalvo = props['db_talhao_id'] as int?;
+      if (talhaoIdSalvo != null) {
+         parcelasParaSalvar.add(Parcela(
+          talhaoId: talhaoIdSalvo,
+          idParcela: pointIdCounter.toString(), areaMetrosQuadrados: 0,
+          latitude: ponto.position.latitude, longitude: ponto.position.longitude,
+          status: StatusParcela.pendente, dataColeta: DateTime.now(),
+          nomeFazenda: props['db_fazenda_nome']?.toString(),
+          idFazenda: props['fazenda_id']?.toString(),
+          nomeTalhao: props['talhao_nome']?.toString(),
+        ));
+        pointIdCounter++;
+      }
+    }
+
+    if (parcelasParaSalvar.isNotEmpty) {
+      await _dbHelper.saveBatchParcelas(parcelasParaSalvar);
+      await loadSamplesParaAtividade();
+    }
+    
+    // A otimização só faz sentido quando geramos para a atividade inteira, não para um único polígono
+    if (featuresParaProcessar == null) {
+      final int talhoesRemovidos = await _optimizerService.otimizarAtividade(_currentAtividade!.id!);
+      
+      _setLoading(false);
+      
+      String mensagemFinal = "${parcelasParaSalvar.length} amostras foram geradas e salvas.";
+      if (talhoesRemovidos > 0) {
+        mensagemFinal += " $talhoesRemovidos talhões vazios foram otimizados.";
+      }
+      return mensagemFinal;
+    } else {
+      _setLoading(false);
+      return "${parcelasParaSalvar.length} amostras foram geradas e salvas para o novo talhão.";
+    }
+  }
+
+  // =======================================================================
+  // <<< FIM DAS MUDANÇAS >>>
+  // =======================================================================
+
+  // Funções existentes que não precisam ser alteradas
   void clearAllMapData() {
     _importedPolygons = [];
     _samplePoints = [];
@@ -263,58 +461,6 @@ class MapProvider with ChangeNotifier {
 
     return "Plano importado: ${parcelasParaSalvar.length} amostras salvas. Novas Fazendas: $novasFazendas, Novos Talhões: $novosTalhoes.";
   }
-
-  Future<String> gerarAmostrasParaAtividade({required double hectaresPerSample}) async {
-    if (_importedPolygons.isEmpty) return "Nenhum polígono de talhão carregado.";
-    if (_currentAtividade == null) return "Erro: Atividade atual não definida.";
-
-    _setLoading(true);
-
-    final pontosGerados = _samplingService.generateMultiTalhaoSamplePoints(
-      importedFeatures: _importedPolygons,
-      hectaresPerSample: hectaresPerSample,
-    );
-
-    if (pontosGerados.isEmpty) {
-      _setLoading(false);
-      return "Nenhum ponto de amostra pôde ser gerado.";
-    }
-
-    final List<Parcela> parcelasParaSalvar = [];
-    int pointIdCounter = 1;
-
-    for (final ponto in pontosGerados) {
-      final props = ponto.properties;
-      final talhaoIdSalvo = props['db_talhao_id'] as int?;
-      if (talhaoIdSalvo != null) {
-         parcelasParaSalvar.add(Parcela(
-          talhaoId: talhaoIdSalvo,
-          idParcela: pointIdCounter.toString(), areaMetrosQuadrados: 0,
-          latitude: ponto.position.latitude, longitude: ponto.position.longitude,
-          status: StatusParcela.pendente, dataColeta: DateTime.now(),
-          nomeFazenda: props['db_fazenda_nome']?.toString(),
-          idFazenda: props['fazenda_id']?.toString(),
-          nomeTalhao: props['talhao_nome']?.toString(),
-        ));
-        pointIdCounter++;
-      }
-    }
-
-    if (parcelasParaSalvar.isNotEmpty) {
-      await _dbHelper.saveBatchParcelas(parcelasParaSalvar);
-      await loadSamplesParaAtividade();
-    }
-    
-    final int talhoesRemovidos = await _optimizerService.otimizarAtividade(_currentAtividade!.id!);
-    
-    _setLoading(false);
-    
-    String mensagemFinal = "${parcelasParaSalvar.length} amostras foram geradas e salvas.";
-    if (talhoesRemovidos > 0) {
-      mensagemFinal += " $talhoesRemovidos talhões vazios foram otimizados.";
-    }
-    return mensagemFinal;
-  }
   
   Future<void> loadSamplesParaAtividade() async {
     if (_currentAtividade == null) return;
@@ -370,13 +516,10 @@ class MapProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // ===== ARQUIVO CORRIGIDO AQUI =====
   SampleStatus _getSampleStatus(Parcela parcela) {
-    // A propriedade 'exportada' tem prioridade máxima.
     if (parcela.exportada) {
       return SampleStatus.exported;
     }
-    // Se não foi exportada, verificamos os outros status.
     switch (parcela.status) {
       case StatusParcela.concluida:
         return SampleStatus.completed;
@@ -384,8 +527,6 @@ class MapProvider with ChangeNotifier {
         return SampleStatus.open;
       case StatusParcela.pendente:
         return SampleStatus.untouched;
-      // Adicionamos o caso 'exportada' aqui para o switch ser "exaustivo" e
-      // evitar o erro de análise. A lógica principal já foi tratada pelo 'if' acima.
       case StatusParcela.exportada:
         return SampleStatus.exported;
     }

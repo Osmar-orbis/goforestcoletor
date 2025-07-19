@@ -1,4 +1,4 @@
-// lib/pages/menu/map_import_page.dart (VERSÃO COMPLETA E FINAL)
+// lib/pages/menu/map_import_page.dart (VERSÃO COM AJUSTES NA APPBAR)
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +21,8 @@ class MapImportPage extends StatefulWidget {
 class _MapImportPageState extends State<MapImportPage> with RouteAware {
   final _mapController = MapController();
 
+  // O resto do seu código inicial (didChangeDependencies, didPopNext, dispose, etc)
+  // permanece exatamente o mesmo.
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -60,11 +62,9 @@ class _MapImportPageState extends State<MapImportPage> with RouteAware {
     }
   }
 
-  // NOVA FUNÇÃO para mostrar o diálogo de importação
   Future<void> _handleImport() async {
     final provider = context.read<MapProvider>();
     
-    // Mostra um diálogo para o usuário escolher o que importar
     final bool? isPlano = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -72,11 +72,11 @@ class _MapImportPageState extends State<MapImportPage> with RouteAware {
         content: const Text('Escolha o tipo de arquivo para importar para esta atividade.'),
         actions: <Widget>[
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false), // Carga de Talhões
+            onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Carga de Talhões (Polígonos)'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true), // Plano de Amostragem
+            onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Plano de Amostragem (Pontos)'),
           ),
         ],
@@ -155,58 +155,57 @@ class _MapImportPageState extends State<MapImportPage> with RouteAware {
   }
 
   Future<void> _handleLocationButtonPressed() async {
-  final provider = context.read<MapProvider>();
+    final provider = context.read<MapProvider>();
+    final currentZoom = _mapController.camera.zoom;
 
-  // <<< MUDANÇA 1: Lendo o zoom atual ANTES de fazer qualquer coisa >>>
-  final currentZoom = _mapController.camera.zoom;
-
-  if (provider.isFollowingUser) {
-    final currentPosition = provider.currentUserPosition;
-    if (currentPosition != null) {
-      // <<< MUDANÇA 2: Usando o zoom atual em vez de um valor fixo >>>
-      _mapController.move(LatLng(currentPosition.latitude, currentPosition.longitude), currentZoom);
-    }
-    return;
-  }
-
-  // O resto da lógica para obter permissão permanece igual
-  bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  if (!mounted) return;
-  if (!serviceEnabled) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Serviço de GPS desabilitado.')));
-    return;
-  }
-  LocationPermission permission = await Geolocator.checkPermission();
-  if (permission == LocationPermission.denied) {
-    permission = await Geolocator.requestPermission();
-    if (permission == LocationPermission.denied && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permissão de localização negada.')));
+    if (provider.isFollowingUser) {
+      final currentPosition = provider.currentUserPosition;
+      if (currentPosition != null) {
+        _mapController.move(LatLng(currentPosition.latitude, currentPosition.longitude), currentZoom);
+      }
       return;
     }
-  }
-  if (permission == LocationPermission.deniedForever && mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permissão negada permanentemente.')));
-    return;
-  }
 
-  try {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Buscando sua localização...')));
-    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    
-    provider.updateUserPosition(position);
-    provider.toggleFollowingUser();
-    
-    // <<< MUDANÇA 3: Usando o zoom atual aqui também >>>
-    _mapController.move(LatLng(position.latitude, position.longitude), currentZoom);
-    
-    HapticFeedback.mediumImpact();
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Não foi possível obter a localização: $e')));
+    if (!serviceEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Serviço de GPS desabilitado.')));
+      return;
+    }
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permissão de localização negada.')));
+        return;
+      }
+    }
+    if (permission == LocationPermission.deniedForever && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permissão negada permanentemente.')));
+      return;
+    }
+
+    try {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Buscando sua localização...')));
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      
+      provider.updateUserPosition(position);
+      provider.toggleFollowingUser();
+      
+      _mapController.move(LatLng(position.latitude, position.longitude), currentZoom);
+      
+      HapticFeedback.mediumImpact();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Não foi possível obter a localização: $e')));
+      }
     }
   }
-}
+
+  // =======================================================================
+  // <<< INÍCIO DAS MUDANÇAS >>>
+  // =======================================================================
 
   AppBar _buildAppBar(MapProvider mapProvider) {
     final atividadeTipo = mapProvider.currentAtividade?.tipo ?? 'Planejamento';
@@ -224,13 +223,14 @@ class _MapImportPageState extends State<MapImportPage> with RouteAware {
               icon: const Icon(Icons.grid_on_sharp),
               onPressed: mapProvider.isLoading ? null : _handleGenerateSamples,
               tooltip: 'Gerar Amostras'),
+        // O botão de Desenhar continua aqui, como no seu fluxo ideal
         IconButton(
             icon: const Icon(Icons.edit_location_alt_outlined),
             onPressed: () => mapProvider.startDrawing(),
             tooltip: 'Desenhar Área'),
         IconButton(
             icon: const Icon(Icons.file_upload_outlined),
-            onPressed: mapProvider.isLoading ? null : _handleImport, // Chama a nova função com diálogo
+            onPressed: mapProvider.isLoading ? null : _handleImport,
             tooltip: 'Importar Arquivo'),
       ],
     );
@@ -243,13 +243,21 @@ class _MapImportPageState extends State<MapImportPage> with RouteAware {
       leading: IconButton(icon: const Icon(Icons.close), onPressed: () => mapProvider.cancelDrawing(), tooltip: 'Cancelar Desenho'),
       actions: [
         IconButton(icon: const Icon(Icons.undo), onPressed: () => mapProvider.undoLastDrawnPoint(), tooltip: 'Desfazer Último Ponto'),
-        IconButton(icon: const Icon(Icons.check), onPressed: () => mapProvider.saveDrawnPolygon(), tooltip: 'Salvar Polígono'),
+        // Ação de salvar agora passa o 'context' para poder abrir o formulário
+        IconButton(icon: const Icon(Icons.check), onPressed: () => mapProvider.saveDrawnPolygon(context), tooltip: 'Salvar Polígono'),
       ],
     );
   }
 
+  // =======================================================================
+  // <<< FIM DAS MUDANÇAS >>>
+  // =======================================================================
+
+
   @override
   Widget build(BuildContext context) {
+    // O resto do seu arquivo build (Scaffold, FlutterMap, etc)
+    // permanece exatamente o mesmo.
     final mapProvider = context.watch<MapProvider>();
     final currentUserPosition = mapProvider.currentUserPosition;
     final isDrawing = mapProvider.isDrawing;

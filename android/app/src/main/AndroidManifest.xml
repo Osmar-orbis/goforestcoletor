@@ -9,24 +9,17 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- ================================================================ -->
-    <!-- PERMISSÕES DE ARQUIVOS CORRIGIDAS (ADICIONE O BLOCO ABAIXO) -->
-    <!-- ================================================================ -->
-
-    <!-- Permissão para Android 10 e inferior -->
+    <!-- Permissões de Arquivos -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    
-    <!-- Permissão para Android 11 e superior (ESSENCIAL PARA IMPORTAÇÃO) -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
     
-    <!-- ================================================================ -->
-    
-
+    <!-- A tag application AGORA com o atributo para compatibilidade -->
     <application
         android:label="geoforestcoletor"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true"> <!-- <<< ADICIONE ESTE ATRIBUTO AQUI -->
         
         <activity
             android:name=".MainActivity"

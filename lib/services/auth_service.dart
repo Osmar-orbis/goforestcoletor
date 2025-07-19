@@ -69,22 +69,28 @@ class AuthService {
         
         // 3. Prepara os dados da licença de teste
         final licenseData = {
-          'email': user.email,
-          'stripeCustomerId': null, // O cliente ainda não tem um ID de pagamento
+          'stripeCustomerId': null, 
           'statusAssinatura': 'trial',
           'features': {
-            'exportacao': false, // Funcionalidades limitadas no trial
+            'exportacao': false,
             'analise': true,
-            },
+          },
           'limites': {
-            'smartphone': 1, // Limite de 1 dispositivo no trial
+            'smartphone': 1,
             'desktop': 0,
           },
           'trial': {
             'ativo': true,
-            'dataInicio': FieldValue.serverTimestamp(), // Usa a hora do servidor
+            'dataInicio': FieldValue.serverTimestamp(),
             'dataFim': Timestamp.fromDate(trialEndDate),
           },
+          // =================================================================
+          // <<< MUDANÇA PRINCIPAL AQUI >>>
+          // Cria o mapa 'usuariosPermitidos' e já insere o próprio usuário.
+          'usuariosPermitidos': {
+            user.uid: 'gerente' // Define o criador da conta como 'gerente' da sua própria licença
+          }
+          // =================================================================
         };
 
         // 4. Salva a licença de teste no Firestore usando o ID do usuário

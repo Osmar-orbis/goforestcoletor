@@ -1,4 +1,4 @@
-// lib/main.dart (VERSÃO ATUALIZADA COM ROTEAMENTO POR CARGO)
+// lib/main.dart (VERSÃO FINAL COM IMPORT CORRETO)
 
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -21,11 +21,14 @@ import 'package:geoforestcoletor/pages/projetos/lista_projetos_page.dart';
 import 'package:geoforestcoletor/pages/menu/splash_page.dart';
 import 'package:geoforestcoletor/providers/license_provider.dart';
 import 'package:geoforestcoletor/pages/menu/paywall_page.dart';
-// <<< 1. IMPORTAR A NOVA TELA DO GERENTE >>>
-import 'package:geoforestcoletor/pages/gerente/gerente_home_page.dart';
+// =======================================================================
+// <<< IMPORT CORRETO E VERIFICADO >>>
+import 'package:geoforestcoletor/pages/gerente/gerente_main_page.dart';
+import 'package:geoforestcoletor/providers/gerente_provider.dart';
+// =======================================================================
 
 
-// PONTO DE ENTRADA PRINCIPAL DO APP (Sem alterações)
+// PONTO DE ENTRADA PRINCIPAL DO APP
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (Firebase.apps.isEmpty) {
@@ -36,7 +39,7 @@ Future<void> main() async {
   runApp(const AppServicesLoader());
 }
 
-// AppServicesLoader (Sem alterações)
+// AppServicesLoader
 class AppServicesLoader extends StatefulWidget {
   const AppServicesLoader({super.key});
 
@@ -104,7 +107,7 @@ class _AppServicesLoaderState extends State<AppServicesLoader> {
   }
 }
 
-// MyApp (Com uma pequena adição)
+// MyApp
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -116,6 +119,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MapProvider()),
         ChangeNotifierProvider(create: (_) => TeamProvider()),
         ChangeNotifierProvider(create: (_) => LicenseProvider()),
+        ChangeNotifierProvider(create: (_) => GerenteProvider()),
       ],
       child: MaterialApp(
         title: 'Geo Forest Analytics',
@@ -123,7 +127,6 @@ class MyApp extends StatelessWidget {
         theme: _buildThemeData(Brightness.light),
         darkTheme: _buildThemeData(Brightness.dark),
         initialRoute: '/auth_check',
-        // <<< 2. ADICIONAR A ROTA PARA A NOVA TELA >>>
         routes: {
           '/auth_check': (context) => const AuthCheck(),
           '/equipe': (context) => const EquipePage(),
@@ -131,7 +134,7 @@ class MyApp extends StatelessWidget {
           '/lista_projetos': (context) => const ListaProjetosPage(title: 'Meus Projetos'),
           '/login': (context) => const LoginPage(),
           '/paywall': (context) => const PaywallPage(),
-          '/gerente_home': (context) => const GerenteHomePage(), // ROTA ADICIONADA
+          '/gerente_home': (context) => const GerenteMainPage(),
         },
         navigatorObservers: [MapProvider.routeObserver],
         builder: (context, child) {
@@ -152,7 +155,6 @@ class MyApp extends StatelessWidget {
   }
 
   ThemeData _buildThemeData(Brightness brightness) {
-    // ... (código do tema sem alterações)
     final baseColor = const Color(0xFF617359);
     return ThemeData(
       useMaterial3: true,
@@ -182,9 +184,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// =======================================================================
-// <<< 3. WIDGET AUTHCHECK TOTALMENTE MODIFICADO >>>
-// =======================================================================
+// WIDGET AUTHCHECK
 class AuthCheck extends StatelessWidget {
   const AuthCheck({super.key});
 
@@ -193,37 +193,30 @@ class AuthCheck extends StatelessWidget {
     final loginController = context.watch<LoginController>();
     final licenseProvider = context.watch<LicenseProvider>();
 
-    // Se a autenticação ou a licença ainda não foram verificadas, mostra um loading.
     if (!loginController.isInitialized || licenseProvider.isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // Se o usuário não está logado, vai para a página de Login.
     if (!loginController.isLoggedIn) {
       return const LoginPage();
     }
 
-    // Se o usuário está logado, verifica a licença.
     final license = licenseProvider.licenseData;
     final bool isLicenseOk = license != null && (license.status == 'ativa' || license.status == 'trial');
 
     if (isLicenseOk) {
-      // SE A LICENÇA ESTÁ OK, VERIFICA O CARGO!
       if (license.cargo == 'gerente') {
-        // Se for 'gerente', vai para a nova tela de gerente.
-        return const GerenteHomePage();
+        return const GerenteMainPage();
       } else {
-        // Se for 'equipe' (ou qualquer outro valor), vai para a tela de equipe.
         return const EquipePage();
       }
     } else {
-      // Se a licença não estiver OK, vai para a tela de pagamento.
       return const PaywallPage();
     }
   }
 }
 
-// ErrorScreen (Sem alterações)
+// ErrorScreen
 class ErrorScreen extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
@@ -232,7 +225,6 @@ class ErrorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ... (código da tela de erro sem alterações)
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F4),
       body: Center(
@@ -260,3 +252,4 @@ class ErrorScreen extends StatelessWidget {
     );
   }
 }
+

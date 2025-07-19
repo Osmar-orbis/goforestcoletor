@@ -21,6 +21,7 @@ class LicensingService {
   // =======================================================================
   /// Busca na coleção 'clientes' por um documento que contenha o UID do usuário no mapa 'usuariosPermitidos'.
   Future<DocumentSnapshot<Map<String, dynamic>>?> findLicenseDocumentForUser(User user) async {
+    print('--- DEBUG: Buscando licença para o UID: ${user.uid}');
     // A consulta usa a notação de ponto para verificar se a chave (o UID do usuário) existe no mapa.
     final query = _firestore
         .collection('clientes')

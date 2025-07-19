@@ -1,4 +1,4 @@
-// lib/pages/talhoes/detalhes_talhao_page.dart (VERSÃO COM STATUS EXPORTADO)
+// lib/pages/talhoes/detalhes_talhao_page.dart (VERSÃO COM O BOTÃO SIMPLIFICADO)
 
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/models/cubagem_arvore_model.dart';
@@ -11,6 +11,9 @@ import 'package:geoforestcoletor/pages/menu/home_page.dart';
 import 'package:geoforestcoletor/pages/dashboard/talhao_dashboard_page.dart';
 import 'package:geoforestcoletor/pages/amostra/coleta_dados_page.dart';
 import 'package:geoforestcoletor/pages/cubagem/cubagem_dados_page.dart';
+// Import do SpeedDial não é mais necessário aqui
+// import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+
 
 class DetalhesTalhaoPage extends StatefulWidget {
   final Talhao talhao;
@@ -24,6 +27,8 @@ class DetalhesTalhaoPage extends StatefulWidget {
 }
 
 class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
+  // Todo o corpo da classe State permanece exatamente o mesmo,
+  // exceto pela função `build` no final.
   late Future<List<dynamic>> _dataFuture;
   final dbHelper = DatabaseHelper.instance;
 
@@ -232,7 +237,6 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
     );
   }
 
-  // ===== MUDANÇA 1: ADICIONAR O NOVO CASO "EXPORTADA" NA FUNÇÃO DE TRADUÇÃO =====
   String _traduzirStatus(StatusParcela status) {
     switch (status) {
       case StatusParcela.pendente:
@@ -246,6 +250,9 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
     }
   }
 
+  // =======================================================================
+  // <<< INÍCIO DA MUDANÇA >>>
+  // =======================================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -317,6 +324,7 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
           ),
         ],
       ),
+      // REVERSÃO DO BOTÃO: Voltamos ao FloatingActionButton simples, pois o de desenho foi para o mapa.
       floatingActionButton: _isSelectionMode
           ? null
           : FloatingActionButton.extended(
@@ -327,6 +335,9 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
             ),
     );
   }
+  // =======================================================================
+  // <<< FIM DA MUDANÇA >>>
+  // =======================================================================
 
   Widget _buildListaDeParcelas(List<Parcela> parcelas) {
     return ListView.builder(
@@ -337,7 +348,6 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
         final isSelected = _selectedItens.contains(parcela.dbId!);
         final dataFormatada = DateFormat('dd/MM/yyyy HH:mm').format(parcela.dataColeta!);
         
-        // ===== MUDANÇA 2: ADICIONAR LÓGICA PARA DEFINIR O STATUS FINAL =====
         final bool foiExportada = parcela.exportada;
         final StatusParcela statusFinal = foiExportada ? StatusParcela.exportada : parcela.status;
         final Color corFinal = foiExportada ? StatusParcela.exportada.cor : parcela.status.cor;
@@ -350,7 +360,6 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
             onTap: () => _isSelectionMode ? _onItemSelected(parcela.dbId!) : _navegarParaDetalhesParcela(parcela),
             onLongPress: () => _toggleSelectionMode(parcela.dbId!),
 
-            // ===== MUDANÇA 3: USAR AS VARIÁVEIS FINAIS NA INTERFACE =====
             leading: CircleAvatar(
               backgroundColor: isSelected ? Theme.of(context).colorScheme.primary : corFinal,
               child: Icon(isSelected ? Icons.check : iconeFinal, color: Colors.white),

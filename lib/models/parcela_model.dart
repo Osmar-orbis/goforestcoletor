@@ -1,8 +1,9 @@
-// lib/models/parcela_model.dart
+// lib/models/parcela_model.dart (VERSÃO ATUALIZADA COM UUID)
 
-import 'dart:convert'; // <<< IMPORT NECESSÁRIO PARA JSON
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/models/arvore_model.dart';
+import 'package:uuid/uuid.dart'; // <<< IMPORT NECESSÁRIO
 
 enum StatusParcela {
   pendente(Icons.pending_outlined, Colors.grey),
@@ -18,6 +19,7 @@ enum StatusParcela {
 
 class Parcela {
   int? dbId;
+  String uuid; // <<< NOVO CAMPO OBRIGATÓRIO
   int? talhaoId; 
   DateTime? dataColeta;
   
@@ -38,25 +40,18 @@ class Parcela {
   final double? comprimento;
   final double? raio;
   
-  // <<< NOVOS CAMPOS >>>
-  List<String> photoPaths; // Para os caminhos das fotos
-  
-  // <<< CAMPOS REMOVIDOS >>>
-  // final String? espacamento;
-  // final double? idadeFloresta;
-  // final double? areaTalhao;
-
+  List<String> photoPaths;
   List<Arvore> arvores;
 
   Parcela({
     this.dbId,
+    String? uuid, // Parâmetro opcional
     required this.talhaoId,
     required this.idParcela,
     required this.areaMetrosQuadrados,
     this.idFazenda,
     this.nomeFazenda,
     this.nomeTalhao,
-    // espacamento, // removido
     this.observacao,
     this.latitude,
     this.longitude,
@@ -67,21 +62,19 @@ class Parcela {
     this.largura,
     this.comprimento,
     this.raio,
-    // idadeFloresta, // removido
-    // areaTalhao,    // removido
-    this.photoPaths = const [], // <<< VALOR PADRÃO
+    this.photoPaths = const [],
     this.arvores = const [],
-  });
+  }) : uuid = uuid ?? const Uuid().v4(); // <<< GERA UUID AUTOMATICAMENTE
 
   Parcela copyWith({
     int? dbId,
+    String? uuid, // <<< ADICIONADO
     int? talhaoId,
     String? idFazenda,
     String? nomeFazenda,
     String? nomeTalhao,
     String? idParcela,
     double? areaMetrosQuadrados,
-    // String? espacamento, // removido
     String? observacao,
     double? latitude,
     double? longitude,
@@ -92,20 +85,18 @@ class Parcela {
     double? largura,
     double? comprimento,
     double? raio,
-    // double? idadeFloresta, // removido
-    // double? areaTalhao,    // removido
-    List<String>? photoPaths, // <<< ADICIONADO
+    List<String>? photoPaths,
     List<Arvore>? arvores,
   }) {
     return Parcela(
       dbId: dbId ?? this.dbId,
+      uuid: uuid ?? this.uuid, // <<< ADICIONADO
       talhaoId: talhaoId ?? this.talhaoId,
       idFazenda: idFazenda ?? this.idFazenda,
       nomeFazenda: nomeFazenda ?? this.nomeFazenda,
       nomeTalhao: nomeTalhao ?? this.nomeTalhao,
       idParcela: idParcela ?? this.idParcela,
       areaMetrosQuadrados: areaMetrosQuadrados ?? this.areaMetrosQuadrados,
-      // espacamento: espacamento ?? this.espacamento, // removido
       observacao: observacao ?? this.observacao,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
@@ -116,9 +107,7 @@ class Parcela {
       largura: largura ?? this.largura,
       comprimento: comprimento ?? this.comprimento,
       raio: raio ?? this.raio,
-      // idadeFloresta: idadeFloresta ?? this.idadeFloresta, // removido
-      // areaTalhao: areaTalhao ?? this.areaTalhao,       // removido
-      photoPaths: photoPaths ?? this.photoPaths, // <<< ADICIONADO
+      photoPaths: photoPaths ?? this.photoPaths,
       arvores: arvores ?? this.arvores,
     );
   }
@@ -126,13 +115,13 @@ class Parcela {
   Map<String, dynamic> toMap() {
     return {
       'id': dbId,
+      'uuid': uuid, // <<< ADICIONADO
       'talhaoId': talhaoId,
       'idFazenda': idFazenda,
       'nomeFazenda': nomeFazenda,
       'nomeTalhao': nomeTalhao,
       'idParcela': idParcela,
       'areaMetrosQuadrados': areaMetrosQuadrados,
-      // 'espacamento': espacamento, // removido
       'observacao': observacao,
       'latitude': latitude,
       'longitude': longitude,
@@ -143,9 +132,7 @@ class Parcela {
       'largura': largura,
       'comprimento': comprimento,
       'raio': raio,
-      'photoPaths': jsonEncode(photoPaths), // <<< SALVA A LISTA COMO TEXTO JSON
-      // 'idadeFloresta': idadeFloresta, // removido
-      // 'areaTalhao': areaTalhao,       // removido
+      'photoPaths': jsonEncode(photoPaths),
     };
   }
 
@@ -153,23 +140,21 @@ class Parcela {
     List<String> paths = [];
     if (map['photoPaths'] != null) {
       try {
-        // Tenta decodificar o JSON. Se falhar, a lista permanece vazia.
         paths = List<String>.from(jsonDecode(map['photoPaths']));
       } catch (e) {
-        // Lida com casos onde o dado pode não ser um JSON válido.
         print("Erro ao decodificar photoPaths: $e");
       }
     }
 
     return Parcela(
       dbId: map['id'],
+      uuid: map['uuid'], // <<< ADICIONADO (DEVE EXISTIR AO VIR DO BD/FIRESTORE)
       talhaoId: map['talhaoId'],
       idFazenda: map['idFazenda'],
       nomeFazenda: map['nomeFazenda'],
       nomeTalhao: map['nomeTalhao'],
       idParcela: map['idParcela'],
       areaMetrosQuadrados: map['areaMetrosQuadrados'],
-      // espacamento: map['espacamento'], // removido
       observacao: map['observacao'],
       latitude: map['latitude'],
       longitude: map['longitude'],
@@ -183,9 +168,7 @@ class Parcela {
       largura: map['largura'],
       comprimento: map['comprimento'],
       raio: map['raio'],
-      photoPaths: paths, // <<< LÊ A LISTA DO TEXTO JSON
-      // idadeFloresta: map['idadeFloresta'], // removido
-      // areaTalhao: map['areaTalhao'],       // removido
+      photoPaths: paths,
     );
   }
 }
