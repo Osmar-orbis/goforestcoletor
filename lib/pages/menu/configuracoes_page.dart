@@ -1,9 +1,9 @@
-// lib/pages/menu/configuracoes_page.dart (VERSÃO CORRIGIDA)
+// lib/pages/menu/configuracoes_page.dart (VERSÃO CORRIGIDA E ATUALIZADA)
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/controller/login_controller.dart';
-import 'package:geoforestcoletor/pages/menu/login_page.dart'; // <<< IMPORT ADICIONADO
+import 'package:geoforestcoletor/pages/menu/login_page.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -27,7 +27,7 @@ class ConfiguracoesPage extends StatefulWidget {
 
 class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
   String? _zonaSelecionada;
-  final dbHelper = DatabaseHelper();
+  final dbHelper = DatabaseHelper.instance; // Correção: usar a instância singleton
   
   final LicensingService _licensingService = LicensingService();
   Map<String, int>? _deviceUsage;
@@ -59,25 +59,32 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
     }
   }
   
+  // =======================================================================
+  // <<< CORREÇÃO PRINCIPAL APLICADA AQUI >>>
+  // =======================================================================
   Future<void> _fetchDeviceUsage() async {
-    final userEmail = FirebaseAuth.instance.currentUser?.email;
-    if (userEmail != null) {
-      final usage = await _licensingService.getDeviceUsage(userEmail);
+    // Não precisamos mais do email, o serviço lida com isso internamente.
+    try {
+      // A chamada agora é feita sem nenhum argumento.
+      final usage = await _licensingService.getDeviceUsage();
       if (mounted) {
         setState(() {
           _deviceUsage = usage;
           _isLoadingLicense = false;
         });
       }
-    } else {
-      if (mounted) {
+    } catch (e) {
+      print("Erro ao buscar uso de dispositivos: $e");
+      if(mounted) {
         setState(() {
           _isLoadingLicense = false;
+          _deviceUsage = null; // Garante que não mostre dados antigos em caso de erro
         });
       }
     }
   }
 
+  // O restante do arquivo não precisa de alterações.
   Future<void> _mostrarDialogoLimpeza({
     required String titulo,
     required String conteudo,
@@ -107,17 +114,13 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
     }
   }
 
-  // <<< FUNÇÃO CORRIGIDA >>>
   Future<void> _handleLogout() async {
     await _mostrarDialogoLimpeza(
       titulo: 'Confirmar Saída',
       conteudo: 'Tem certeza de que deseja sair da sua conta?',
       isDestructive: false,
       onConfirmar: () async {
-        // Usa o Provider para acessar o LoginController e chamar o método signOut
         await context.read<LoginController>().signOut();
-        
-        // FORÇA a navegação para a tela de login e limpa todas as telas anteriores
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const LoginPage()),

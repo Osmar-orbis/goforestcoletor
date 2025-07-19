@@ -1,4 +1,4 @@
-// lib/main.dart (VERSÃO FINAL - MODO WHATSAPP)
+// lib/main.dart (VERSÃO ATUALIZADA COM ROTEAMENTO POR CARGO)
 
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -21,24 +21,22 @@ import 'package:geoforestcoletor/pages/projetos/lista_projetos_page.dart';
 import 'package:geoforestcoletor/pages/menu/splash_page.dart';
 import 'package:geoforestcoletor/providers/license_provider.dart';
 import 'package:geoforestcoletor/pages/menu/paywall_page.dart';
+// <<< 1. IMPORTAR A NOVA TELA DO GERENTE >>>
+import 'package:geoforestcoletor/pages/gerente/gerente_home_page.dart';
 
-// PONTO DE ENTRADA PRINCIPAL DO APP
+
+// PONTO DE ENTRADA PRINCIPAL DO APP (Sem alterações)
 Future<void> main() async {
-  // Garante que os bindings do Flutter estão prontos
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Inicializa o Firebase de forma segura, evitando duplicação
   if (Firebase.apps.isEmpty) {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
-  
-  // Inicia a UI
   runApp(const AppServicesLoader());
 }
 
-// Este widget carrega os serviços ADICIONAIS após o Firebase Core já estar pronto.
+// AppServicesLoader (Sem alterações)
 class AppServicesLoader extends StatefulWidget {
   const AppServicesLoader({super.key});
 
@@ -57,27 +55,19 @@ class _AppServicesLoaderState extends State<AppServicesLoader> {
 
   Future<void> _initializeRemainingServices() async {
     try {
-      // Adiciona um delay para a splash screen ser visível
       await Future.delayed(const Duration(seconds: 2));
-
-      // Ativa o Firebase App Check
       const androidProvider = kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity;
       await FirebaseAppCheck.instance.activate(androidProvider: androidProvider);
       print("Firebase App Check ativado com sucesso.");
-
-      // Configura a orientação do dispositivo
       await SystemChrome.setPreferredOrientations(
         [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown],
       );
-
-      // Configura o SQFlite para Desktop, se aplicável
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
         sqfliteFfiInit();
         databaseFactory = databaseFactoryFfi;
       }
     } catch (e) {
       print("!!!!!! ERRO NA INICIALIZAÇÃO DOS SERVIÇOS: $e !!!!!");
-      // relança o erro para o FutureBuilder poder capturá-lo
       rethrow;
     }
   }
@@ -102,21 +92,19 @@ class _AppServicesLoaderState extends State<AppServicesLoader> {
             ),
           );
         }
-
         if (snapshot.connectionState != ConnectionState.done) {
           return const MaterialApp(
             debugShowCheckedModeBanner: false,
             home: SplashPage(),
           );
         }
-
         return const MyApp();
       },
     );
   }
 }
 
-// WIDGET PRINCIPAL DO APLICATIVO (SEM ALTERAÇÕES)
+// MyApp (Com uma pequena adição)
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -135,6 +123,7 @@ class MyApp extends StatelessWidget {
         theme: _buildThemeData(Brightness.light),
         darkTheme: _buildThemeData(Brightness.dark),
         initialRoute: '/auth_check',
+        // <<< 2. ADICIONAR A ROTA PARA A NOVA TELA >>>
         routes: {
           '/auth_check': (context) => const AuthCheck(),
           '/equipe': (context) => const EquipePage(),
@@ -142,6 +131,7 @@ class MyApp extends StatelessWidget {
           '/lista_projetos': (context) => const ListaProjetosPage(title: 'Meus Projetos'),
           '/login': (context) => const LoginPage(),
           '/paywall': (context) => const PaywallPage(),
+          '/gerente_home': (context) => const GerenteHomePage(), // ROTA ADICIONADA
         },
         navigatorObservers: [MapProvider.routeObserver],
         builder: (context, child) {
@@ -162,6 +152,7 @@ class MyApp extends StatelessWidget {
   }
 
   ThemeData _buildThemeData(Brightness brightness) {
+    // ... (código do tema sem alterações)
     final baseColor = const Color(0xFF617359);
     return ThemeData(
       useMaterial3: true,
@@ -191,7 +182,9 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// WIDGET DE VERIFICAÇÃO DE AUTENTICAÇÃO E LICENÇA (SEM ALTERAÇÕES)
+// =======================================================================
+// <<< 3. WIDGET AUTHCHECK TOTALMENTE MODIFICADO >>>
+// =======================================================================
 class AuthCheck extends StatelessWidget {
   const AuthCheck({super.key});
 
@@ -200,21 +193,37 @@ class AuthCheck extends StatelessWidget {
     final loginController = context.watch<LoginController>();
     final licenseProvider = context.watch<LicenseProvider>();
 
+    // Se a autenticação ou a licença ainda não foram verificadas, mostra um loading.
     if (!loginController.isInitialized || licenseProvider.isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    if (loginController.isLoggedIn) {
-      final license = licenseProvider.licenseData;
-      final bool isLicenseOk = license != null && (license.status == 'ativa' || license.status == 'trial');
-      return isLicenseOk ? const EquipePage() : const PaywallPage();
-    } else {
+    // Se o usuário não está logado, vai para a página de Login.
+    if (!loginController.isLoggedIn) {
       return const LoginPage();
+    }
+
+    // Se o usuário está logado, verifica a licença.
+    final license = licenseProvider.licenseData;
+    final bool isLicenseOk = license != null && (license.status == 'ativa' || license.status == 'trial');
+
+    if (isLicenseOk) {
+      // SE A LICENÇA ESTÁ OK, VERIFICA O CARGO!
+      if (license.cargo == 'gerente') {
+        // Se for 'gerente', vai para a nova tela de gerente.
+        return const GerenteHomePage();
+      } else {
+        // Se for 'equipe' (ou qualquer outro valor), vai para a tela de equipe.
+        return const EquipePage();
+      }
+    } else {
+      // Se a licença não estiver OK, vai para a tela de pagamento.
+      return const PaywallPage();
     }
   }
 }
 
-// TELA DE ERRO GENÉRICA (SEM ALTERAÇÕES)
+// ErrorScreen (Sem alterações)
 class ErrorScreen extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
@@ -223,6 +232,7 @@ class ErrorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ... (código da tela de erro sem alterações)
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F4),
       body: Center(

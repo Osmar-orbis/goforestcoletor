@@ -1,8 +1,10 @@
-// lib/providers/license_provider.dart
+// lib/providers/license_provider.dart (VERSÃO ATUALIZADA PARA O NOVO MODELO)
 
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+// <<< 1. IMPORTAR O NOSSO NOVO SERVIÇO >>>
+import 'package:geoforestcoletor/services/licensing_service.dart';
 
 // Modelo para guardar os dados da licença
 class LicenseData {
@@ -10,15 +12,18 @@ class LicenseData {
   final DateTime? trialEndDate;
   final Map<String, dynamic> features;
   final Map<String, dynamic> limites;
+  // <<< 2. ADICIONAR O CAMPO 'CARGO' >>>
+  final String cargo;
 
   LicenseData({
     required this.status,
     this.trialEndDate,
     required this.features,
     required this.limites,
+    required this.cargo, // Adicionado ao construtor
   });
 
-  // Verifica se o trial está expirando em breve (ex: nos últimos 3 dias)
+  // A lógica de 'isTrialExpiringSoon' não precisa de alterações.
   bool get isTrialExpiringSoon {
     if (status != 'trial' || trialEndDate == null) {
       return false;
@@ -29,52 +34,75 @@ class LicenseData {
 }
 
 class LicenseProvider with ChangeNotifier {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  // <<< 1. INSTANCIAR O NOSSO SERVIÇO >>>
+  final LicensingService _licensingService = LicensingService();
 
   LicenseData? _licenseData;
-  bool _isLoading = true; // Inicia como true
+  bool _isLoading = true;
   String? _error;
 
   LicenseData? get licenseData => _licenseData;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Construtor que ouve as mudanças de autenticação
   LicenseProvider() {
     _auth.authStateChanges().listen((user) {
       if (user != null) {
-        fetchLicenseData(user.uid);
+        // A chamada agora não precisa passar o UID, a função cuidará disso.
+        fetchLicenseData();
       } else {
         clearLicenseData();
       }
     });
+    // Dispara a primeira verificação caso já haja um usuário logado
+    if (_auth.currentUser != null) {
+      fetchLicenseData();
+    }
   }
 
-  Future<void> fetchLicenseData(String uid) async {
+  // =======================================================================
+  // <<< 3. FUNÇÃO DE BUSCA DE DADOS COMPLETAMENTE REESCRITA >>>
+  // =======================================================================
+  Future<void> fetchLicenseData() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      clearLicenseData();
+      return;
+    }
+
     _isLoading = true;
     _error = null;
-    // Notifica os ouvintes que o carregamento começou
     notifyListeners();
 
     try {
-      final doc = await _firestore.collection('clientes').doc(uid).get();
+      // Usa o serviço para encontrar o documento da licença da empresa
+      final doc = await _licensingService.findLicenseDocumentForUser(user);
 
-      if (doc.exists) {
+      if (doc != null && doc.exists) {
         final data = doc.data()!;
         final trialData = data['trial'] as Map<String, dynamic>?;
         
+        // Extrai o mapa de usuários permitidos
+        final usuariosPermitidos = data['usuariosPermitidos'] as Map<String, dynamic>? ?? {};
+        
+        // Extrai o cargo específico do usuário logado a partir do seu UID
+        final cargoDoUsuario = usuariosPermitidos[user.uid] as String? ?? 'equipe'; // Padrão 'equipe' por segurança
+
         _licenseData = LicenseData(
           status: data['statusAssinatura'] ?? 'inativa',
           trialEndDate: (trialData?['dataFim'] as Timestamp?)?.toDate(),
           features: data['features'] ?? {},
           limites: data['limites'] ?? {},
+          cargo: cargoDoUsuario, // Salva o cargo no nosso modelo
         );
       } else {
-        _error = "Documento de licença não encontrado.";
+        _error = "Sua conta não foi encontrada em nenhuma licença ativa.";
+        _licenseData = null; // Garante que a licença antiga seja limpa
       }
     } catch (e) {
       _error = "Erro ao buscar dados da licença: $e";
+       _licenseData = null;
     }
 
     _isLoading = false;
@@ -83,7 +111,7 @@ class LicenseProvider with ChangeNotifier {
 
   void clearLicenseData() {
     _licenseData = null;
-    _isLoading = false;
+    _isLoading = false; // Garante que o estado de loading seja resetado
     _error = null;
     notifyListeners();
   }
