@@ -1,4 +1,4 @@
-// lib/pages/menu/home_page.dart (VERSÃO COMPLETA E CORRIGIDA)
+// lib/pages/menu/home_page.dart (VERSÃO COM FLUXO DE SELEÇÃO DE PROJETO)
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -13,8 +13,6 @@ import 'package:geoforestcoletor/providers/map_provider.dart';
 import 'package:geoforestcoletor/providers/license_provider.dart';
 import 'package:geoforestcoletor/services/export_service.dart';
 import 'package:geoforestcoletor/widgets/menu_card.dart';
-
-// Importação necessária para a nova funcionalidade de sincronização
 import 'package:geoforestcoletor/services/sync_service.dart';
 
 class HomePage extends StatefulWidget {
@@ -26,29 +24,24 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Estado para controlar o loading da sincronização
   bool _isSyncing = false;
 
-  // Função para chamar o serviço de sincronização
   Future<void> _executarSincronizacao() async {
-    if (_isSyncing) return; // Evita múltiplos cliques
-
+    // ... (esta função não muda)
+    if (_isSyncing) return;
     setState(() => _isSyncing = true);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Iniciando sincronização...'), duration: Duration(seconds: 15)),
     );
-
     try {
       final syncService = SyncService();
       await syncService.sincronizarDados();
-
       if (mounted) {
         ScaffoldMessenger.of(context).removeCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Dados sincronizados com sucesso!'), backgroundColor: Colors.green),
         );
       }
-      
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).removeCurrentSnackBar();
@@ -62,9 +55,8 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-
-  // O conteúdo de _mostrarDialogoImportacao, _abrirAnalistaDeDados,
-  // e _mostrarDialogoExportacao permanece EXATAMENTE O MESMO.
+  
+  // <<< LÓGICA DE IMPORTAÇÃO RESTAURADA PARA NAVEGAR PARA A LISTA DE PROJETOS >>>
   void _mostrarDialogoImportacao(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -72,49 +64,28 @@ class _HomePageState extends State<HomePage> {
         children: <Widget>[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-            child: Text('O que você deseja importar?', style: Theme.of(context).textTheme.titleLarge),
+            child: Text('Importar Dados para um Projeto', style: Theme.of(context).textTheme.titleLarge),
           ),
           ListTile(
-            leading: const Icon(Icons.table_rows_outlined, color: Colors.green),
-            title: const Text('Coletas de Parcela (Inventário)'),
-            subtitle: const Text('Importa um arquivo CSV com dados de árvores e parcelas.'),
+            leading: const Icon(Icons.file_upload_outlined, color: Colors.blue),
+            title: const Text('Importar Arquivo CSV Universal'),
+            subtitle: const Text('Selecione o projeto de destino para os dados.'),
             onTap: () {
               Navigator.of(ctx).pop();
               Navigator.push(context, MaterialPageRoute(
                 builder: (context) => const ListaProjetosPage(
                   title: 'Importar para o Projeto...',
-                  isImporting: true,
-                  importType: 'parcela',
+                  isImporting: true, // Ativa o modo de importação
                 ),
               ));
             },
-          ),
-          ListTile(
-            leading: const Icon(Icons.straighten_outlined, color: Colors.brown),
-            title: const Text('Dados de Cubagem'),
-            subtitle: const Text('Importa um arquivo CSV com dados de cubagem e seções.'),
-            onTap: () {
-              Navigator.of(ctx).pop();
-              Navigator.push(context, MaterialPageRoute(
-                builder: (context) => const ListaProjetosPage(
-                  title: 'Importar Cubagem para...',
-                  isImporting: true,
-                  importType: 'cubagem',
-                ),
-              ));
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.rule_folder_outlined, color: Colors.grey.shade400),
-            title: const Text('Auditoria (Em breve)'),
-            subtitle: const Text('Importa dados para o módulo de auditoria.'),
-            onTap: null,
           ),
         ],
       ),
     );
   }
 
+  // O resto do arquivo (build, _abrirAnalista, _mostrarDialogoExportacao, etc.) não muda.
   void _abrirAnalistaDeDados(BuildContext context) {
     Navigator.push(
       context,
@@ -324,11 +295,10 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute(builder: (context) => const PaywallPage()),
               ),
             ),
-            // Card de Sincronização
             MenuCard(
               icon: _isSyncing ? Icons.downloading_outlined : Icons.sync_outlined,
               label: _isSyncing ? 'Sincronizando...' : 'Sincronizar Dados',
-              onTap: _isSyncing ? () {} : _executarSincronizacao, // Ação do botão
+              onTap: _isSyncing ? () {} : _executarSincronizacao,
             ),
           ],
         ),

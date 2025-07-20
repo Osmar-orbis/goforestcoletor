@@ -1,16 +1,13 @@
-// lib/data/datasources/local/database_helper.dart (VERSÃO ATUALIZADA COM UUID)
+// lib/data/datasources/local/database_helper.dart (VERSÃO FINAL E COMPLETA)
 
 import 'dart:convert';
-import 'dart:math';
 import 'package:csv/csv.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:proj4dart/proj4dart.dart' as proj4;
 import 'package:sqflite/sqflite.dart';
-import 'package:collection/collection.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart'; // <<< IMPORT NECESSÁRIO
+import 'package:uuid/uuid.dart';
 
 // Imports de Modelos
 import 'package:geoforestcoletor/models/projeto_model.dart';
@@ -22,11 +19,8 @@ import 'package:geoforestcoletor/models/arvore_model.dart';
 import 'package:geoforestcoletor/models/cubagem_arvore_model.dart';
 import 'package:geoforestcoletor/models/cubagem_secao_model.dart';
 import 'package:geoforestcoletor/models/sortimento_model.dart';
-
-// Import de Serviços
 import 'package:geoforestcoletor/services/analysis_service.dart';
 
-// --- CONSTANTES DE PROJEÇÃO GEOGRÁFICA ---
 const Map<String, int> zonasUtmSirgas2000 = {
   'SIRGAS 2000 / UTM Zona 18S': 31978, 'SIRGAS 2000 / UTM Zona 19S': 31979,
   'SIRGAS 2000 / UTM Zona 20S': 31980, 'SIRGAS 2000 / UTM Zona 21S': 31981,
@@ -45,7 +39,8 @@ final Map<int, String> proj4Definitions = {
   31985: '+proj=utm +zone=25 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
 };
 
-// --- CLASSE PRINCIPAL DO BANCO DE DADOS ---
+enum TipoImportacao { inventario, cubagem, desconhecido }
+
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._privateConstructor();
   static Database? _database;
@@ -64,10 +59,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       join(await getDatabasesPath(), 'geoforestcoletor.db'),
-      // ===================================================================
-      // <<< MUDANÇA 1: INCREMENTAR A VERSÃO DO BANCO DE DADOS >>>
-      // ===================================================================
-      version: 25, 
+      version: 26,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -124,9 +116,6 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE parcelas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        -- =================================================================
-        -- <<< MUDANÇA 2: ADICIONAR O CAMPO UUID NA CRIAÇÃO DA TABELA >>>
-        -- =================================================================
         uuid TEXT NOT NULL UNIQUE,
         talhaoId INTEGER,
         nomeFazenda TEXT,
@@ -180,6 +169,7 @@ class DatabaseHelper {
         alturaBase REAL NOT NULL,
         classe TEXT,
         exportada INTEGER DEFAULT 0 NOT NULL,
+        isSynced INTEGER DEFAULT 0 NOT NULL,
         FOREIGN KEY (talhaoId) REFERENCES talhoes (id) ON DELETE CASCADE
       )
     ''');
@@ -213,26 +203,9 @@ class DatabaseHelper {
     for (var v = oldVersion + 1; v <= newVersion; v++) {
       debugPrint("Executando migração de banco de dados para a versão $v...");
        switch (v) {
-        case 21:
-          // ... (cases antigos permanecem)
-          break;
-        case 22:
-          // ... (cases antigos permanecem)
-          break;
-        case 23:
-          // ... (cases antigos permanecem)
-          break;
-        case 24:
-          // ... (cases antigos permanecem)
-          break;
-        // ===================================================================
-        // <<< MUDANÇA 3: ADICIONAR A LÓGICA DE MIGRAÇÃO PARA O UUID >>>
-        // ===================================================================
         case 25:
           await db.execute('ALTER TABLE parcelas ADD COLUMN uuid TEXT');
-          // Busca todas as parcelas existentes que ainda não têm um UUID
           final parcelasSemUuid = await db.query('parcelas', where: 'uuid IS NULL');
-          // Gera e salva um UUID para cada uma delas
           for (final p in parcelasSemUuid) {
             await db.update(
               'parcelas', 
@@ -241,15 +214,13 @@ class DatabaseHelper {
               whereArgs: [p['id']]
             );
           }
-          // Torna a coluna obrigatória e única após preenchê-la (opcional, mas bom para consistência)
-          // Nota: O SQLite tem limitações para adicionar UNIQUE em colunas existentes.
-          // A verificação será feita na lógica do app para garantir a unicidade.
+          break;
+        case 26:
+          await db.execute('ALTER TABLE cubagens_arvores ADD COLUMN isSynced INTEGER DEFAULT 0 NOT NULL');
           break;
       }
     }
   }
-
-  // O resto do arquivo permanece o mesmo...
 
   // --- MÉTODOS CRUD: HIERARQUIA ---
   Future<int> insertProjeto(Projeto p) async => await (await database).insert('projetos', p.toMap());
@@ -257,39 +228,31 @@ class DatabaseHelper {
     final maps = await (await database).query('projetos', orderBy: 'dataCriacao DESC');
     return List.generate(maps.length, (i) => Projeto.fromMap(maps[i]));
   }
-
   Future<Projeto?> getProjetoById(int id) async {
     final db = await database;
     final maps = await db.query('projetos', where: 'id = ?', whereArgs: [id]);
     if (maps.isNotEmpty) return Projeto.fromMap(maps.first);
     return null;
   }
-
   Future<void> deleteProjeto(int id) async => await (await database).delete('projetos', where: 'id = ?', whereArgs: [id]);
   Future<int> insertAtividade(Atividade a) async => await (await database).insert('atividades', a.toMap());
-
   Future<List<Atividade>> getAtividadesDoProjeto(int projetoId) async {
     final maps = await (await database).query('atividades', where: 'projetoId = ?', whereArgs: [projetoId], orderBy: 'dataCriacao DESC');
     return List.generate(maps.length, (i) => Atividade.fromMap(maps[i]));
   }
-
   Future<List<Atividade>> getTodasAsAtividades() async {
     final db = await database;
     final maps = await db.query('atividades', orderBy: 'dataCriacao DESC');
     return List.generate(maps.length, (i) => Atividade.fromMap(maps[i]));
   }
-
   Future<void> deleteAtividade(int id) async => await (await database).delete('atividades', where: 'id = ?', whereArgs: [id]);
   Future<void> insertFazenda(Fazenda f) async => await (await database).insert('fazendas', f.toMap(), conflictAlgorithm: ConflictAlgorithm.fail);
-
   Future<List<Fazenda>> getFazendasDaAtividade(int atividadeId) async {
     final maps = await (await database).query('fazendas', where: 'atividadeId = ?', whereArgs: [atividadeId], orderBy: 'nome');
     return List.generate(maps.length, (i) => Fazenda.fromMap(maps[i]));
   }
-
   Future<void> deleteFazenda(String id, int atividadeId) async => await (await database).delete('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [id, atividadeId]);
   Future<int> insertTalhao(Talhao t) async => await (await database).insert('talhoes', t.toMap());
-
   Future<List<Talhao>> getTalhoesDaFazenda(String fazendaId, int fazendaAtividadeId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.rawQuery('''
@@ -301,7 +264,6 @@ class DatabaseHelper {
     ''', [fazendaId, fazendaAtividadeId]);
     return List.generate(maps.length, (i) => Talhao.fromMap(maps[i]));
   }
-
   Future<void> deleteTalhao(int id) async {
     final db = await database;
     await db.transaction((txn) async {
@@ -310,13 +272,11 @@ class DatabaseHelper {
       await txn.delete('talhoes', where: 'id = ?', whereArgs: [id]);
     });
   }
-
   Future<double> getAreaTotalTalhoesDaFazenda(String fazendaId, int fazendaAtividadeId) async {
     final result = await (await database).rawQuery('SELECT SUM(areaHa) as total FROM talhoes WHERE fazendaId = ? AND fazendaAtividadeId = ?', [fazendaId, fazendaAtividadeId]);
     if (result.isNotEmpty && result.first['total'] != null) return (result.first['total'] as num).toDouble();
     return 0.0;
   }
-
   Future<Projeto?> getProjetoPelaAtividade(int atividadeId) async {
     final db = await database;
     final maps = await db.rawQuery('''
@@ -324,26 +284,20 @@ class DatabaseHelper {
       JOIN atividades A ON P.id = A.projetoId
       WHERE A.id = ?
     ''', [atividadeId]);
-
     if (maps.isNotEmpty) {
       return Projeto.fromMap(maps.first);
     }
     return null;
   }
-
   Future<void> criarAtividadeComPlanoDeCubagem(
       Atividade novaAtividade, List<CubagemArvore> placeholders) async {
     if (placeholders.isEmpty) {
       throw Exception("A lista de árvores para cubagem (placeholders) não pode estar vazia.");
     }
-    
     final db = await database;
-
     await db.transaction((txn) async {
       final atividadeId = await txn.insert('atividades', novaAtividade.toMap());
-
       final firstPlaceholder = placeholders.first;
-
       final fazendaDoPlano = Fazenda(
         id: firstPlaceholder.idFazenda!,
         atividadeId: atividadeId,
@@ -353,14 +307,12 @@ class DatabaseHelper {
       );
       await txn.insert('fazendas', fazendaDoPlano.toMap(),
           conflictAlgorithm: ConflictAlgorithm.replace);
-
       final talhaoDoPlano = Talhao(
         fazendaId: fazendaDoPlano.id,
         fazendaAtividadeId: fazendaDoPlano.atividadeId,
         nome: firstPlaceholder.nomeTalhao,
       );
       final talhaoId = await txn.insert('talhoes', talhaoDoPlano.toMap());
-
       for (final placeholder in placeholders) {
         final map = placeholder.toMap();
         map['talhaoId'] = talhaoId;
@@ -368,7 +320,6 @@ class DatabaseHelper {
         await txn.insert('cubagens_arvores', map);
       }
     });
-    
     debugPrint('Atividade de cubagem e ${placeholders.length} placeholders criados com sucesso!');
   }
 
@@ -378,36 +329,30 @@ class DatabaseHelper {
     final dbId = await db.insert('parcelas', parcela.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
     return parcela.copyWith(dbId: dbId);
   }
-
   Future<Parcela?> getParcelaPorIdParcela(int talhaoId, String idParcela) async {
     final db = await database;
     final maps = await db.query('parcelas', where: 'talhaoId = ? AND idParcela = ?', whereArgs: [talhaoId, idParcela], limit: 1);
     if (maps.isNotEmpty) return Parcela.fromMap(maps.first);
     return null;
   }
-
   Future<List<Parcela>> getParcelasDoTalhao(int talhaoId) async {
     final db = await database;
     final maps = await db.query('parcelas', where: 'talhaoId = ?', whereArgs: [talhaoId], orderBy: 'dataColeta DESC');
     return List.generate(maps.length, (i) => Parcela.fromMap(maps[i]));
   }
-
   Future<List<Parcela>> getUnsyncedParcelas() async {
     final db = await database;
     final maps = await db.query('parcelas', where: 'isSynced = ?', whereArgs: [0]);
     return List.generate(maps.length, (i) => Parcela.fromMap(maps[i]));
   }
-
   Future<void> markParcelaAsSynced(int id) async {
     final db = await database;
     await db.update('parcelas', {'isSynced': 1}, where: 'id = ?', whereArgs: [id]);
   }
-
   Future<void> limparTodasAsParcelas() async {
     await (await database).delete('parcelas');
     debugPrint('Tabela de parcelas e árvores limpa.');
   }
-
   Future<void> saveBatchParcelas(List<Parcela> parcelas) async {
     final db = await database;
     final batch = db.batch();
@@ -416,7 +361,6 @@ class DatabaseHelper {
     }
     await batch.commit(noResult: true);
   }
-
   Future<Parcela> saveFullColeta(Parcela p, List<Arvore> arvores) async {
     final db = await database;
     await db.transaction((txn) async {
@@ -443,42 +387,34 @@ class DatabaseHelper {
     });
     return p;
   }
-
   Future<Parcela?> getParcelaById(int id) async {
     final db = await database;
     final maps = await db.query('parcelas', where: 'id = ?', whereArgs: [id]);
     if (maps.isNotEmpty) return Parcela.fromMap(maps.first);
     return null;
   }
-
   Future<List<Arvore>> getArvoresDaParcela(int parcelaId) async {
     final db = await database;
     final maps = await db.query('arvores', where: 'parcelaId = ?', whereArgs: [parcelaId], orderBy: 'linha, posicaoNaLinha, id');
     return List.generate(maps.length, (i) => Arvore.fromMap(maps[i]));
   }
-
   Future<List<Parcela>> getTodasParcelas() async {
     final db = await database;
     final maps = await db.query('parcelas', orderBy: 'dataColeta DESC');
     return List.generate(maps.length, (i) => Parcela.fromMap(maps[i]));
   }
-
   Future<int> deleteParcela(int id) async => await (await database).delete('parcelas', where: 'id = ?', whereArgs: [id]);
-
   Future<void> deletarMultiplasParcelas(List<int> ids) async {
     if (ids.isEmpty) return;
     final db = await database;
     await db.delete('parcelas', where: 'id IN (${List.filled(ids.length, '?').join(',')})', whereArgs: ids);
   }
-
   Future<int> updateParcela(Parcela p) async => await (await database).update('parcelas', p.toMap(), where: 'id = ?', whereArgs: [p.dbId]);
-
   Future<int> limparParcelasExportadas() async {
     final count = await (await database).delete('parcelas', where: 'exportada = ?', whereArgs: [1]);
     debugPrint('$count parcelas exportadas foram apagadas.');
     return count;
   }
-
   Future<Map<String, List<String>>> getProjetosDisponiveis() async {
     final db = await database;
     final maps = await db.query('parcelas', columns: ['nomeFazenda', 'nomeTalhao'], where: 'status = ?', whereArgs: [StatusParcela.concluida.name], distinct: true, orderBy: 'nomeFazenda, nomeTalhao');
@@ -493,21 +429,19 @@ class DatabaseHelper {
     }
     return projetos;
   }
-
   Future<void> updateParcelaStatus(int parcelaId, StatusParcela novoStatus) async {
     final db = await database;
     await db.update('parcelas', {'status': novoStatus.name}, where: 'id = ?', whereArgs: [parcelaId]);
   }
-
   Future<void> limparTodasAsCubagens() async {
     await (await database).delete('cubagens_arvores');
     debugPrint('Tabela de cubagens e seções limpa.');
   }
-
   Future<void> salvarCubagemCompleta(CubagemArvore arvore, List<CubagemSecao> secoes) async {
     final db = await database;
     await db.transaction((txn) async {
       int id;
+      arvore.isSynced = false;
       final map = arvore.toMap();
       if (arvore.id == null) {
         id = await txn.insert('cubagens_arvores', map, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -523,32 +457,26 @@ class DatabaseHelper {
       }
     });
   }
-
   Future<List<CubagemArvore>> getTodasCubagensDoTalhao(int talhaoId) async {
     final db = await database;
     final maps = await db.query('cubagens_arvores', where: 'talhaoId = ?', whereArgs: [talhaoId], orderBy: 'id ASC');
     return List.generate(maps.length, (i) => CubagemArvore.fromMap(maps[i]));
   }
-
   Future<List<CubagemArvore>> getTodasCubagens() async {
     final db = await database;
     final maps = await db.query('cubagens_arvores', orderBy: 'id DESC');
     return List.generate(maps.length, (i) => CubagemArvore.fromMap(maps[i]));
   }
-
   Future<List<CubagemSecao>> getSecoesPorArvoreId(int id) async {
     final db = await database;
     final maps = await db.query('cubagens_secoes', where: 'cubagemArvoreId = ?', whereArgs: [id], orderBy: 'alturaMedicao ASC');
     return List.generate(maps.length, (i) => CubagemSecao.fromMap(maps[i]));
   }
-
   Future<void> deletarCubagem(int id) async => await (await database).delete('cubagens_arvores', where: 'id = ?', whereArgs: [id]);
-
   Future<void> deletarMultiplasCubagens(List<int> ids) async {
     if (ids.isEmpty) return;
     await (await database).delete('cubagens_arvores', where: 'id IN (${List.filled(ids.length, '?').join(',')})', whereArgs: ids);
   }
-
   Future<void> gerarPlanoDeCubagemNoBanco(Talhao talhao, int totalParaCubar, int novaAtividadeId) async {
     final analysisService = AnalysisService();
     final dadosAgregados = await getDadosAgregadosDoTalhao(talhao.id!);
@@ -571,6 +499,7 @@ class DatabaseHelper {
             nomeTalhao: talhao.nome,
             identificador: '${talhao.nome} - Árvore ${i.toString().padLeft(2, '0')}',
             classe: classe,
+            isSynced: false,
           );
           await txn.insert('cubagens_arvores', arvoreCubagem.toMap());
         }
@@ -585,14 +514,12 @@ class DatabaseHelper {
     if (result.isEmpty) return {};
     return { for (var row in result) (row['codigo'] as String): (row['total'] as int).toDouble() };
   }
-
   Future<List<Map<String, dynamic>>> getValoresCAP(int parcelaId) async {
     final db = await database;
     final result = await db.query('arvores', columns: ['cap', 'codigo'], where: 'parcelaId = ?', whereArgs: [parcelaId]);
     if (result.isEmpty) return [];
     return result.map((row) => {'cap': row['cap'] as double, 'codigo': row['codigo'] as String}).toList();
   }
-
   Future<Map<String, dynamic>> getDadosAgregadosDoTalhao(int talhaoId) async {
     final parcelas = await getParcelasDoTalhao(talhaoId);
     final concluidas = parcelas.where((p) => p.status == StatusParcela.concluida).toList();
@@ -602,13 +529,11 @@ class DatabaseHelper {
     }
     return {'parcelas': concluidas, 'arvores': arvores};
   }
-
   Future<List<Parcela>> getTodasAsParcelasConcluidas() async {
     final db = await database;
     final maps = await db.query('parcelas', where: 'status = ?', whereArgs: [StatusParcela.concluida.name]);
     return List.generate(maps.length, (i) => Parcela.fromMap(maps[i]));
   }
-
   Future<List<Talhao>> getTalhoesComParcelasConcluidas() async {
     final db = await database;
     final List<Map<String, dynamic>> idMaps = await db.query('parcelas', distinct: true, columns: ['talhaoId'], where: 'status = ?', whereArgs: [StatusParcela.concluida.name]);
@@ -629,13 +554,11 @@ class DatabaseHelper {
     final maps = await db.query('parcelas', where: 'status = ? AND exportada = ?', whereArgs: [StatusParcela.concluida.name, 0]);
     return List.generate(maps.length, (i) => Parcela.fromMap(maps[i]));
   }
-  
   Future<List<Parcela>> getTodasAsParcelasConcluidasParaBackup() async {
     final db = await database;
     final maps = await db.query('parcelas', where: 'status = ?', whereArgs: [StatusParcela.concluida.name]);
     return List.generate(maps.length, (i) => Parcela.fromMap(maps[i]));
   }
-
   Future<void> marcarParcelasComoExportadas(List<int> ids) async {
     if (ids.isEmpty) return;
     final db = await database;
@@ -646,151 +569,6 @@ class DatabaseHelper {
       whereArgs: ids,
     );
   }
-  
-  Future<String> importarColetaDeEquipe(String csvContent, int atividadeIdAlvo) async {
-    final db = await database;
-    int parcelasProcessadas = 0;
-    int arvoresImportadas = 0;
-    int novasFazendas = 0;
-    int novosTalhoes = 0;
-    
-    // ===== INÍCIO DA LÓGICA DE DETECÇÃO AUTOMÁTICA =====
-    if (csvContent.isEmpty) return "Erro: O arquivo CSV está vazio.";
-
-    final firstLine = csvContent.split('\n').first;
-    final commaCount = ','.allMatches(firstLine).length;
-    final semicolonCount = ';'.allMatches(firstLine).length;
-
-    String detectedDelimiter = ',';
-    if (semicolonCount > commaCount) {
-      detectedDelimiter = ';';
-    }
-    
-    debugPrint("Separador de coluna detectado: '$detectedDelimiter'");
-    // ===== FIM DA LÓGICA DE DETECÇÃO AUTOMÁTICA =====
-
-    final List<List<dynamic>> rows = CsvToListConverter(fieldDelimiter: detectedDelimiter, eol: '\n').convert(csvContent);
-    if (rows.length < 2) return "Erro: O arquivo CSV está vazio ou contém apenas o cabeçalho.";
-    
-    final headers = rows.first.map((h) => h.toString().trim()).toList();
-    final dataRows = rows.sublist(1).map((row) => Map.fromIterables(headers, row)).toList();
-
-    final parcelasAgrupadas = groupBy(dataRows, (row) {
-        final idFazenda = row['Codigo_Fazenda']?.toString() ?? row['Fazenda']?.toString() ?? 'FAZENDA_PADRAO';
-        final nomeTalhao = row['Talhao']?.toString() ?? 'TALHAO_PADRAO';
-        final idParcela = row['ID_Coleta_Parcela']?.toString() ?? 'PARCELA_PADRAO';
-        return '$idFazenda-$nomeTalhao-$idParcela';
-    });
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final nomeZona = prefs.getString('zona_utm_selecionada') ?? 'SIRGAS 2000 / UTM Zona 22S';
-      final codigoEpsg = zonasUtmSirgas2000[nomeZona]!;
-      final projWGS84 = proj4.Projection.get('EPSG:4326')!;
-      final projUTM = proj4.Projection.get('EPSG:$codigoEpsg')!;
-
-      await db.transaction((txn) async {
-        for (var entry in parcelasAgrupadas.entries) {
-            final grupoDeLinhas = entry.value;
-            final primeiraLinha = grupoDeLinhas.first;
-
-            final idFazenda = primeiraLinha['Codigo_Fazenda']?.toString() ?? primeiraLinha['Fazenda']?.toString() ?? 'FAZENDA_PADRAO';
-            Fazenda? fazenda = (await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [idFazenda, atividadeIdAlvo])).map((e) => Fazenda.fromMap(e)).firstOrNull;
-            if (fazenda == null) {
-                fazenda = Fazenda(id: idFazenda, atividadeId: atividadeIdAlvo, nome: primeiraLinha['Fazenda'].toString(), municipio: 'N/I', estado: 'N/I');
-                await txn.insert('fazendas', fazenda.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
-                novasFazendas++;
-            }
-            
-            final nomeTalhao = primeiraLinha['Talhao']?.toString() ?? 'TALHAO_PADRAO';
-            Talhao? talhao = (await txn.query('talhoes', where: 'nome = ? AND fazendaId = ? AND fazendaAtividadeId = ?', whereArgs: [nomeTalhao, fazenda.id, fazenda.atividadeId])).map((e) => Talhao.fromMap(e)).firstOrNull;
-            if (talhao == null) {
-                talhao = Talhao(
-                    fazendaId: fazenda.id, 
-                    fazendaAtividadeId: fazenda.atividadeId, 
-                    nome: nomeTalhao,
-                    areaHa: double.tryParse(primeiraLinha['Area_ha_Talhao']?.toString().replaceAll(',', '.') ?? ''),
-                    especie: primeiraLinha['Especie_Talhao']?.toString(),
-                    espacamento: primeiraLinha['Espacamento_Talhao']?.toString(),
-                );
-                final talhaoId = await txn.insert('talhoes', talhao.toMap());
-                talhao = talhao.copyWith(id: talhaoId);
-                novosTalhoes++;
-            }
-
-            // ===== AJUSTE PARA NÚMEROS GRANDES E DECIMAIS =====
-            double area = double.tryParse(primeiraLinha['Area_m2']?.toString().replaceAll('.', '').replaceAll(',', '.') ?? '0') ?? 0;
-            double? largura = double.tryParse(primeiraLinha['Largura_m']?.toString().replaceAll(',', '.') ?? '');
-            double? comprimento = double.tryParse(primeiraLinha['Comprimento_m']?.toString().replaceAll(',', '.') ?? '');
-            double? raio = double.tryParse(primeiraLinha['Raio_m']?.toString().replaceAll(',', '.') ?? '');
-            if (area <= 0) {
-                if (largura != null && comprimento != null) area = largura * comprimento;
-                else if (raio != null) area = pi * raio * raio;
-            }
-
-            double? lat, lon;
-            final easting = double.tryParse(primeiraLinha['Easting']?.toString().replaceAll(',', '.') ?? '');
-            final northing = double.tryParse(primeiraLinha['Northing']?.toString().replaceAll(',', '.') ?? '');
-            if(easting != null && northing != null) {
-                final pontoWGS84 = projUTM.transform(projWGS84, proj4.Point(x: easting, y: northing));
-                lat = pontoWGS84.y;
-                lon = pontoWGS84.x;
-            } else {
-                lat = double.tryParse(primeiraLinha['Latitude']?.toString().replaceAll(',', '.') ?? '');
-                lon = double.tryParse(primeiraLinha['Longitude']?.toString().replaceAll(',', '.') ?? '');
-            }
-
-            final idParcelaColeta = primeiraLinha['ID_Coleta_Parcela']?.toString() ?? 'PARCELA_PADRAO';
-            Parcela? parcelaExistente = (await txn.query('parcelas', where: 'idParcela = ? AND talhaoId = ?', whereArgs: [idParcelaColeta, talhao.id!])).map((e) => Parcela.fromMap(e)).firstOrNull;
-            
-            final novaParcela = Parcela(
-                dbId: parcelaExistente?.dbId, talhaoId: talhao.id!, idParcela: idParcelaColeta,
-                areaMetrosQuadrados: area, largura: largura, comprimento: comprimento, raio: raio,
-                latitude: lat, longitude: lon,
-                dataColeta: DateTime.tryParse(primeiraLinha['Data_Coleta']?.toString() ?? '') ?? DateTime.now(),
-                status: StatusParcela.concluida,
-                nomeFazenda: primeiraLinha['Fazenda'].toString(), nomeTalhao: nomeTalhao, idFazenda: idFazenda,
-            );
-
-            int parcelaDbId;
-            if (parcelaExistente == null) {
-                parcelaDbId = await txn.insert('parcelas', novaParcela.toMap());
-            } else {
-                parcelaDbId = parcelaExistente.dbId!;
-                await txn.update('parcelas', novaParcela.toMap(), where: 'id = ?', whereArgs: [parcelaDbId]);
-                await txn.delete('arvores', where: 'parcelaId = ?', whereArgs: [parcelaDbId]);
-            }
-            parcelasProcessadas++;
-
-            for (final linhaArvore in grupoDeLinhas) {
-                // ===== AJUSTE PARA NÚMEROS DECIMAIS (CAP e Altura) =====
-                final cap = double.tryParse(linhaArvore['CAP_cm']?.toString().replaceAll(',', '.') ?? '');
-                if (cap != null) {
-                    final novaArvore = Arvore(
-                        cap: cap,
-                        altura: double.tryParse(linhaArvore['Altura_m']?.toString().replaceAll(',', '.') ?? ''),
-                        linha: int.tryParse(linhaArvore['Linha']?.toString() ?? '0') ?? 0,
-                        posicaoNaLinha: int.tryParse(linhaArvore['Posicao_na_Linha']?.toString() ?? '0') ?? 0,
-                        dominante: linhaArvore['Dominante']?.toString().toLowerCase() == 'sim',
-                        codigo: Codigo.values.firstWhere((e) => e.name == linhaArvore['Codigo_Arvore']?.toString(), orElse: () => Codigo.normal),
-                        fimDeLinha: false,
-                    );
-                    final arvoreMap = novaArvore.toMap();
-                    arvoreMap['parcelaId'] = parcelaDbId;
-                    await txn.insert('arvores', arvoreMap);
-                    arvoresImportadas++;
-                }
-            }
-        }
-      });
-      return "Importação Concluída!\n\nParcelas Processadas: $parcelasProcessadas\nÁrvores Inseridas: $arvoresImportadas\n\nEstruturas Criadas na Atividade:\n- Fazendas: $novasFazendas\n- Talhões: $novosTalhoes";
-    } catch (e, s) {
-      debugPrint("Erro ao importar CSV: $e");
-      debugPrint("Stack Trace: $s");
-      return "Erro Crítico: Ocorreu uma falha ao processar o arquivo. Verifique o formato do CSV e tente novamente.\n\nDetalhe: ${e.toString()}";
-    }
-  }
-  
   Future<String> importarProjetoCompleto(String fileContent) async {
     final db = await database;
     int projetosCriados = 0;
@@ -864,19 +642,6 @@ class DatabaseHelper {
       return "Erro ao importar: O arquivo pode estar mal formatado ou os dados são inválidos. ($e)";
     }
   }
-
-  Future<List<CubagemArvore>> getUnexportedCubagens() async {
-    final db = await database;
-    final maps = await db.query('cubagens_arvores', where: 'exportada = ?', whereArgs: [0]);
-    return List.generate(maps.length, (i) => CubagemArvore.fromMap(maps[i]));
-  }
-
-  Future<List<CubagemArvore>> getTodasCubagensParaBackup() async {
-    final db = await database;
-    final maps = await db.query('cubagens_arvores');
-    return List.generate(maps.length, (i) => CubagemArvore.fromMap(maps[i]));
-  }
-
   Future<void> marcarCubagensComoExportadas(List<int> ids) async {
     if (ids.isEmpty) return;
     final db = await database;
@@ -887,132 +652,219 @@ class DatabaseHelper {
       whereArgs: ids,
     );
   }
-
-  Future<String> importarCubagemDeEquipe(String csvContent, int atividadeIdAlvo) async {
+  Future<String> importarCsvUniversal(String csvContent, {required int projetoIdAlvo}) async {
     final db = await database;
-    int arvoresImportadas = 0;
-    int secoesImportadas = 0;
-    int novasFazendas = 0;
-    int novosTalhoes = 0;
+    int linhasProcessadas = 0;
+    int atividadesCriadas = 0;
+    int fazendasCriadas = 0;
+    int talhoesCriados = 0;
+    int parcelasCriadas = 0;
+    int arvoresCriadas = 0;
+    int cubagensCriadas = 0;
+    int secoesCriadas = 0;
 
-    // ===== INÍCIO DA LÓGICA DE DETECÇÃO AUTOMÁTICA =====
+    final Projeto? projeto = await getProjetoById(projetoIdAlvo);
+    if (projeto == null) {
+      return "Erro Crítico: O projeto de destino selecionado não foi encontrado no banco de dados.";
+    }
+    
     if (csvContent.isEmpty) return "Erro: O arquivo CSV está vazio.";
-
     final firstLine = csvContent.split('\n').first;
     final commaCount = ','.allMatches(firstLine).length;
     final semicolonCount = ';'.allMatches(firstLine).length;
-
+    final tabCount = '\t'.allMatches(firstLine).length;
     String detectedDelimiter = ',';
-    if (semicolonCount > commaCount) {
+    if (semicolonCount > commaCount && semicolonCount > tabCount) {
       detectedDelimiter = ';';
+    } else if (tabCount > commaCount && tabCount > semicolonCount) {
+      detectedDelimiter = '\t';
     }
+    debugPrint("Separador universal detectado: '$detectedDelimiter'");
     
-    debugPrint("Separador de cubagem detectado: '$detectedDelimiter'");
-    // ===== FIM DA LÓGICA DE DETECÇÃO AUTOMÁTICA =====
+    final List<List<dynamic>> rows = CsvToListConverter(fieldDelimiter: detectedDelimiter, eol: '\n', allowInvalid: true).convert(csvContent);
+    if (rows.length < 2) return "Erro: O arquivo CSV está vazio ou contém apenas o cabeçalho.";
+    final headers = rows.first.map((h) => h.toString().trim().toLowerCase()).toList();
+    final dataRows = rows.sublist(1).where((row) => row.any((cell) => cell != null && cell.toString().trim().isNotEmpty)).map((row) => Map<String, dynamic>.fromIterables(headers, row)).toList();
 
-    final List<List<dynamic>> rows = CsvToListConverter(fieldDelimiter: detectedDelimiter, eol: '\n').convert(csvContent);
-    if (rows.length < 2) return "Erro: Arquivo CSV vazio ou com apenas cabeçalho.";
-
-    final headers = rows.first.map((h) => h.toString().trim()).toList();
-    final dataRows = rows.sublist(1);
-    
-    final Map<String, List<Map<String, dynamic>>> arvoresAgrupadas = {};
-
-    for (final row in dataRows) {
-        final rowMap = Map<String, dynamic>.fromIterables(headers, row);
-        final idArvore = rowMap['identificador_arvore']?.toString();
-        final nomeFazenda = rowMap['fazenda']?.toString();
-        final nomeTalhao = rowMap['talhao']?.toString();
-        
-        if (idArvore == null || nomeFazenda == null || nomeTalhao == null) continue;
-        
-        final chaveUnica = "$nomeFazenda-$nomeTalhao-$idArvore";
-        
-        if (!arvoresAgrupadas.containsKey(chaveUnica)) {
-            arvoresAgrupadas[chaveUnica] = [];
+    String? getValue(Map<String, dynamic> row, List<String> possibleKeys) {
+      for (final key in possibleKeys) {
+        if (row.containsKey(key.toLowerCase())) {
+          final value = row[key.toLowerCase()]?.toString();
+          return (value == null || value.toLowerCase() == 'null' || value.trim().isEmpty) ? null : value;
         }
-        arvoresAgrupadas[chaveUnica]!.add(rowMap);
+      }
+      return null;
     }
-    
-    if (arvoresAgrupadas.isEmpty) {
-        return "Nenhuma árvore com identificador válido encontrada no CSV.";
-    }
+
+    Map<String, Atividade> atividadeCache = {};
+    Map<String, Fazenda> fazendaCache = {};
+    Map<String, Talhao> talhaoCache = {};
+    Map<String, int> parcelaIdCache = {};
+    Map<String, CubagemArvore> cubagemCache = {};
 
     try {
       await db.transaction((txn) async {
-        final Map<String, Fazenda> fazendaCache = {};
-        final Map<String, int> talhaoCache = {};
-
-        for (final entry in arvoresAgrupadas.entries) {
-          final dadosPrimeiraLinha = entry.value.first;
+        for (final row in dataRows) {
+          linhasProcessadas++;
           
-          final idFazenda = dadosPrimeiraLinha['id_fazenda']?.toString() ?? dadosPrimeiraLinha['fazenda'].toString();
-          final chaveFazenda = '$idFazenda-$atividadeIdAlvo';
-
-          if (!fazendaCache.containsKey(chaveFazenda)) {
-              Fazenda? fazenda = (await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [idFazenda, atividadeIdAlvo])).map((e) => Fazenda.fromMap(e)).firstOrNull;
-              if (fazenda == null) {
-                  final novaFazenda = Fazenda(id: idFazenda, atividadeId: atividadeIdAlvo, nome: dadosPrimeiraLinha['fazenda'].toString(), municipio: 'N/I', estado: 'N/I');
-                  await txn.insert('fazendas', novaFazenda.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
-                  fazenda = novaFazenda;
-                  novasFazendas++;
+          final tipoAtividadeStr = getValue(row, ['atividade', 'tipo_atividade'])?.toUpperCase();
+          if (tipoAtividadeStr == null) continue;
+          
+          final tipoAtividadeKey = '${projeto.id}-$tipoAtividadeStr';
+          Atividade atividade;
+          if(atividadeCache.containsKey(tipoAtividadeKey)) {
+            atividade = atividadeCache[tipoAtividadeKey]!;
+          } else {
+              final aList = await txn.query('atividades', where: 'projetoId = ? AND tipo = ?', whereArgs: [projeto.id!, tipoAtividadeStr]);
+              if(aList.isNotEmpty) {
+                  atividade = Atividade.fromMap(aList.first);
+              } else {
+                  atividade = Atividade(projetoId: projeto.id!, tipo: tipoAtividadeStr, descricao: 'Importado via CSV', dataCriacao: DateTime.now());
+                  final aId = await txn.insert('atividades', atividade.toMap());
+                  atividade = atividade.copyWith(id: aId);
+                  atividadesCriadas++;
               }
-              fazendaCache[chaveFazenda] = fazenda;
+              atividadeCache[tipoAtividadeKey] = atividade;
           }
-          final Fazenda fazenda = fazendaCache[chaveFazenda]!;
 
-          final nomeTalhao = dadosPrimeiraLinha['talhao'].toString();
-          final chaveTalhao = "${fazenda.id}-${fazenda.atividadeId}-$nomeTalhao";
-
-          if (!talhaoCache.containsKey(chaveTalhao)) {
-            Talhao? talhao = (await txn.query('talhoes', where: 'nome = ? AND fazendaId = ? AND fazendaAtividadeId = ?', whereArgs: [nomeTalhao, fazenda.id, fazenda.atividadeId])).map((e) => Talhao.fromMap(e)).firstOrNull;
-            if (talhao == null) {
-                final novoTalhao = Talhao(fazendaId: fazenda.id, fazendaAtividadeId: fazenda.atividadeId, nome: nomeTalhao);
-                final talhaoId = await txn.insert('talhoes', novoTalhao.toMap());
-                novosTalhoes++;
-                talhaoCache[chaveTalhao] = talhaoId;
-            } else {
-                talhaoCache[chaveTalhao] = talhao.id!;
-            }
+          final nomeFazenda = getValue(row, ['fazenda', 'nome_fazenda']) ?? 'Fazenda Padrão';
+          final idFazenda = getValue(row, ['codigo_fazenda', 'id_fazenda']) ?? nomeFazenda;
+          final fazendaKey = '${atividade.id}-$idFazenda';
+          
+          Fazenda fazenda;
+          if(fazendaCache.containsKey(fazendaKey)) {
+              fazenda = fazendaCache[fazendaKey]!;
+          } else {
+              final fList = await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [idFazenda, atividade.id!]);
+              if(fList.isNotEmpty) {
+                  fazenda = Fazenda.fromMap(fList.first);
+              } else {
+                  fazenda = Fazenda(id: idFazenda, atividadeId: atividade.id!, nome: nomeFazenda, municipio: getValue(row, ['municipio']) ?? 'N/I', estado: getValue(row, ['estado']) ?? 'N/I');
+                  await txn.insert('fazendas', fazenda.toMap());
+                  fazendasCriadas++;
+              }
+              fazendaCache[fazendaKey] = fazenda;
           }
-          final int talhaoId = talhaoCache[chaveTalhao]!;
+          
+          final nomeTalhao = getValue(row, ['talhao', 'nome_talhao']) ?? 'Talhão Padrão';
+          final talhaoKey = '${fazenda.id}-${fazenda.atividadeId}-$nomeTalhao';
+          
+          Talhao talhao;
+          if(talhaoCache.containsKey(talhaoKey)) {
+              talhao = talhaoCache[talhaoKey]!;
+          } else {
+              final tList = await txn.query('talhoes', where: 'nome = ? AND fazendaId = ? AND fazendaAtividadeId = ?', whereArgs: [nomeTalhao, fazenda.id, fazenda.atividadeId]);
+              if (tList.isNotEmpty) {
+                  talhao = Talhao.fromMap(tList.first);
+              } else {
+                  talhao = Talhao(fazendaId: fazenda.id, fazendaAtividadeId: fazenda.atividadeId, nome: nomeTalhao);
+                  final tId = await txn.insert('talhoes', talhao.toMap());
+                  talhao = talhao.copyWith(id: tId);
+                  talhoesCriados++;
+              }
+              talhaoCache[talhaoKey] = talhao;
+          }
+          
+          TipoImportacao tipoLinha = ['IPC', 'IFC', 'AUD', 'IFS', 'BIO'].contains(tipoAtividadeStr) ? TipoImportacao.inventario : (tipoAtividadeStr == 'CUB' ? TipoImportacao.cubagem : TipoImportacao.desconhecido);
 
-          final arvoreCubagem = CubagemArvore(
-            talhaoId: talhaoId,
-            idFazenda: idFazenda,
-            nomeFazenda: fazenda.nome,
-            nomeTalhao: nomeTalhao,
-            identificador: dadosPrimeiraLinha['identificador_arvore'].toString(),
-            classe: dadosPrimeiraLinha['classe']?.toString(),
-            // ===== AJUSTE PARA NÚMEROS DECIMAIS =====
-            alturaTotal: double.tryParse(dadosPrimeiraLinha['altura_total_m']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
-            tipoMedidaCAP: dadosPrimeiraLinha['tipo_medida_cap']?.toString() ?? 'fita',
-            valorCAP: double.tryParse(dadosPrimeiraLinha['valor_cap']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
-            alturaBase: double.tryParse(dadosPrimeiraLinha['altura_base_m']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
-          );
-          final arvoreCubagemId = await txn.insert('cubagens_arvores', arvoreCubagem.toMap());
-          arvoresImportadas++;
+          if (tipoLinha == TipoImportacao.inventario) {
+              final idParcelaColeta = getValue(row, ['id_coleta_parcela', 'id_parcela']);
+              if (idParcelaColeta == null) continue;
 
-          for (final rowMap in entry.value) {
-            final secao = CubagemSecao(
-              cubagemArvoreId: arvoreCubagemId,
-              // ===== AJUSTE PARA NÚMEROS DECIMAIS =====
-              alturaMedicao: double.tryParse(rowMap['altura_medicao_secao_m']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
-              circunferencia: double.tryParse(rowMap['circunferencia_secao_cm']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
-              casca1_mm: double.tryParse(rowMap['casca1_mm']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
-              casca2_mm: double.tryParse(rowMap['casca2_mm']?.toString().replaceAll(',', '.') ?? '0') ?? 0,
-            );
-            if (secao.alturaMedicao > 0) {
-              await txn.insert('cubagens_secoes', secao.toMap());
-              secoesImportadas++;
-            }
+              final parcelaKey = '${talhao.id}-$idParcelaColeta';
+              int parcelaDbId;
+
+              if (parcelaIdCache.containsKey(parcelaKey)) {
+                  parcelaDbId = parcelaIdCache[parcelaKey]!;
+              } else {
+                  final parcelasDoBanco = await txn.query('parcelas', where: 'idParcela = ? AND talhaoId = ?', whereArgs: [idParcelaColeta, talhao.id!]);
+                  if (parcelasDoBanco.isEmpty) {
+                      final novaParcela = Parcela(
+                          talhaoId: talhao.id!, idParcela: idParcelaColeta,
+                          areaMetrosQuadrados: double.tryParse(getValue(row, ['area_m2'])?.replaceAll(',', '.') ?? '0') ?? 0,
+                          status: StatusParcela.concluida, dataColeta: DateTime.now(),
+                          nomeFazenda: fazenda.nome, nomeTalhao: talhao.nome, isSynced: false,
+                      );
+                      parcelaDbId = await txn.insert('parcelas', novaParcela.toMap());
+                      parcelasCriadas++;
+                  } else {
+                      parcelaDbId = Parcela.fromMap(parcelasDoBanco.first).dbId!;
+                  }
+                  parcelaIdCache[parcelaKey] = parcelaDbId;
+              }
+
+              final codigoStr = getValue(row, ['codigo_arvore', 'codigo']);
+              if (codigoStr != null) {
+                  // <<< CORREÇÃO APLICADA AQUI >>>
+                  final dominante = getValue(row, ['dominante'])?.toLowerCase() == 'sim' || getValue(row, ['dominante'])?.toLowerCase() == 'true';
+
+                  final novaArvore = Arvore(
+                      cap: double.tryParse(getValue(row, ['cap_cm'])?.replaceAll(',', '.') ?? '0.0') ?? 0.0,
+                      altura: double.tryParse(getValue(row, ['altura_m'])?.replaceAll(',', '.') ?? ''),
+                      linha: int.tryParse(getValue(row, ['linha']) ?? '0') ?? 0,
+                      posicaoNaLinha: int.tryParse(getValue(row, ['posicao_na_linha']) ?? '0') ?? 0,
+                      dominante: dominante, // <<< VALOR CORRETO SENDO USADO
+                      codigo: Codigo.values.firstWhere((e) => e.name.toLowerCase() == codigoStr.toLowerCase(), orElse: () => Codigo.normal),
+                      fimDeLinha: false,
+                  );
+                  final arvoreMap = novaArvore.toMap();
+                  arvoreMap['parcelaId'] = parcelaDbId;
+                  await txn.insert('arvores', arvoreMap);
+                  arvoresCriadas++;
+              }
+
+          } else if (tipoLinha == TipoImportacao.cubagem) {
+              final idArvore = getValue(row, ['identificador_arvore', 'id_db_arvore']);
+              if (idArvore == null) continue;
+
+              final arvoreKey = '${talhao.id}-$idArvore';
+              CubagemArvore arvoreCubagem;
+
+              if (cubagemCache.containsKey(arvoreKey)) {
+                  arvoreCubagem = cubagemCache[arvoreKey]!;
+              } else {
+                  final cubagensDoBanco = await txn.query('cubagens_arvores', where: 'talhaoId = ? AND identificador = ?', whereArgs: [talhao.id!, idArvore]);
+                  if (cubagensDoBanco.isEmpty) {
+                    arvoreCubagem = CubagemArvore(
+                        talhaoId: talhao.id!, idFazenda: fazenda.id, nomeFazenda: fazenda.nome, nomeTalhao: talhao.nome,
+                        identificador: idArvore,
+                        alturaTotal: double.tryParse(getValue(row, ['altura_total_m'])?.replaceAll(',', '.') ?? '0') ?? 0,
+                        valorCAP: double.tryParse(getValue(row, ['valor_cap', 'cap_cm'])?.replaceAll(',', '.') ?? '0') ?? 0,
+                        alturaBase: double.tryParse(getValue(row, ['altura_base_m'])?.replaceAll(',', '.') ?? '0') ?? 0,
+                        tipoMedidaCAP: getValue(row, ['tipo_medida_cap']) ?? 'fita',
+                        isSynced: false,
+                    );
+                    final cubagemId = await txn.insert('cubagens_arvores', arvoreCubagem.toMap());
+                    arvoreCubagem = arvoreCubagem.copyWith(id: cubagemId);
+                    cubagensCriadas++;
+                  } else {
+                    arvoreCubagem = CubagemArvore.fromMap(cubagensDoBanco.first);
+                  }
+                  cubagemCache[arvoreKey] = arvoreCubagem;
+              }
+
+              final alturaMedicaoStr = getValue(row, ['altura_medicao_secao_m', 'altura_medicao_m']);
+              if (alturaMedicaoStr != null) {
+                  final alturaMedicao = double.tryParse(alturaMedicaoStr.replaceAll(',', '.')) ?? -1;
+                  if (alturaMedicao >= 0) {
+                      final novaSecao = CubagemSecao(
+                          cubagemArvoreId: arvoreCubagem.id!,
+                          alturaMedicao: alturaMedicao,
+                          circunferencia: double.tryParse(getValue(row, ['circunferencia_secao_cm', 'circunferencia_cm'])?.replaceAll(',', '.') ?? '0') ?? 0,
+                          casca1_mm: double.tryParse(getValue(row, ['casca1_mm'])?.replaceAll(',', '.') ?? '0') ?? 0,
+                          casca2_mm: double.tryParse(getValue(row, ['casca2_mm'])?.replaceAll(',', '.') ?? '0') ?? 0,
+                      );
+                      await txn.insert('cubagens_secoes', novaSecao.toMap());
+                      secoesCriadas++;
+                  }
+              }
           }
         }
       });
-      return "Importação Concluída!\n\nÁrvores Cubadas Novas: $arvoresImportadas\nSeções Novas: $secoesImportadas\n\nEstruturas Criadas na Atividade:\n- Fazendas: $novasFazendas\n- Talhões: $novosTalhoes";
-    } catch (e, s) {
-      debugPrint("Erro ao importar CSV de cubagem: $e\nStack: $s");
-      return "Erro Crítico: Ocorreu uma falha ao processar o arquivo. Verifique o formato do CSV e tente novamente.\n\nDetalhe: ${e.toString()}";
+      return "Importação Concluída para o projeto '${projeto.nome}'!\n\nLinhas Processadas: $linhasProcessadas\nAtividades Novas: $atividadesCriadas\nFazendas Novas: $fazendasCriadas\nTalhões Novos: $talhoesCriados\nParcelas Novas: $parcelasCriadas\nÁrvores Inseridas: $arvoresCriadas\nCubagens Inseridas: $cubagensCriadas\nSeções Inseridas: $secoesCriadas";
+    } catch(e, s) {
+      debugPrint("Erro CRÍTICO na importação universal: $e\n$s");
+      return "Ocorreu um erro grave durante a importação. Verifique o console de debug para mais detalhes. Erro: ${e.toString()}";
     }
   }
 
@@ -1032,17 +884,11 @@ class DatabaseHelper {
   Future<void> deleteSortimento(int id) async =>
       await (await database).delete('sortimentos', where: 'id = ?', whereArgs: [id]);
       
-  // =====================================================================
-  // <<< NOVA FUNÇÃO DE SEGURANÇA ADICIONADA AQUI >>>
-  // =====================================================================
-  
-  /// DELETA o arquivo físico do banco de dados do dispositivo.
-  /// Usado durante o logout para garantir que nenhum dado de usuário vaze para a próxima sessão.
+  // --- MÉTODOS DE SEGURANÇA E SINCRONIZAÇÃO ---
   Future<void> deleteDatabaseFile() async {
-    // Fecha a conexão com o banco se ela estiver aberta, para liberar o arquivo.
     if (_database != null && _database!.isOpen) {
       await _database!.close();
-      _database = null; // Zera a instância para forçar a recriação no próximo login.
+      _database = null;
     }
     
     try {
@@ -1051,8 +897,29 @@ class DatabaseHelper {
       debugPrint("Banco de dados local completamente apagado com sucesso.");
     } catch (e) {
       debugPrint("!!!!!! ERRO AO APAGAR O BANCO DE DADOS: $e !!!!!");
-      // Mesmo que falhe, tentamos garantir que a instância seja nula.
       _database = null;
     }
+  }
+
+  Future<List<CubagemArvore>> getUnsyncedCubagens() async {
+    final db = await database;
+    final maps = await db.query('cubagens_arvores', where: 'isSynced = ?', whereArgs: [0]);
+    return List.generate(maps.length, (i) => CubagemArvore.fromMap(maps[i]));
+  }
+  Future<List<CubagemArvore>> getUnexportedCubagens() async {
+    final db = await database;
+    final maps = await db.query('cubagens_arvores', where: 'exportada = ?', whereArgs: [0]);
+    return List.generate(maps.length, (i) => CubagemArvore.fromMap(maps[i]));
+  }
+
+  Future<List<CubagemArvore>> getTodasCubagensParaBackup() async {
+    final db = await database;
+    final maps = await db.query('cubagens_arvores');
+    return List.generate(maps.length, (i) => CubagemArvore.fromMap(maps[i]));
+  }
+
+  Future<void> markCubagemAsSynced(int id) async {
+    final db = await database;
+    await db.update('cubagens_arvores', {'isSynced': 1}, where: 'id = ?', whereArgs: [id]);
   }
 }

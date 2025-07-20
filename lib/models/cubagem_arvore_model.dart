@@ -1,17 +1,16 @@
-// lib/models/cubagem_arvore_model.dart
+// lib/models/cubagem_arvore_model.dart (VERSÃO COMPLETA E CORRIGIDA)
 
 class CubagemArvore {
-  // Atributos do Banco de Dados e Identificação
   int? id;
-  int? talhaoId; // Chave estrangeira para o Talhão
+  int? talhaoId;
   String? idFazenda;
   String nomeFazenda;
   String nomeTalhao;
   String identificador;
   String? classe;
   bool exportada;
+  bool isSynced; // <<< CAMPO ADICIONADO
 
-  // Atributos de Medição
   double alturaTotal;
   String tipoMedidaCAP;
   double valorCAP;
@@ -26,13 +25,45 @@ class CubagemArvore {
     required this.identificador,
     this.classe,
     this.exportada = false,
-    
-    // Medição
-    this.alturaTotal = 0, // Valor padrão para registros "esqueleto"
+    this.isSynced = false, // <<< CAMPO ADICIONADO AO CONSTRUTOR
+    this.alturaTotal = 0,
     this.tipoMedidaCAP = 'fita',
     this.valorCAP = 0,
     this.alturaBase = 0,
   });
+
+  // <<< MÉTODO copyWith ADICIONADO >>>
+  CubagemArvore copyWith({
+    int? id,
+    int? talhaoId,
+    String? idFazenda,
+    String? nomeFazenda,
+    String? nomeTalhao,
+    String? identificador,
+    String? classe,
+    bool? exportada,
+    bool? isSynced,
+    double? alturaTotal,
+    String? tipoMedidaCAP,
+    double? valorCAP,
+    double? alturaBase,
+  }) {
+    return CubagemArvore(
+      id: id ?? this.id,
+      talhaoId: talhaoId ?? this.talhaoId,
+      idFazenda: idFazenda ?? this.idFazenda,
+      nomeFazenda: nomeFazenda ?? this.nomeFazenda,
+      nomeTalhao: nomeTalhao ?? this.nomeTalhao,
+      identificador: identificador ?? this.identificador,
+      classe: classe ?? this.classe,
+      exportada: exportada ?? this.exportada,
+      isSynced: isSynced ?? this.isSynced,
+      alturaTotal: alturaTotal ?? this.alturaTotal,
+      tipoMedidaCAP: tipoMedidaCAP ?? this.tipoMedidaCAP,
+      valorCAP: valorCAP ?? this.valorCAP,
+      alturaBase: alturaBase ?? this.alturaBase,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -48,6 +79,7 @@ class CubagemArvore {
       'valorCAP': valorCAP,
       'alturaBase': alturaBase,
       'exportada': exportada ? 1 : 0,
+      'isSynced': isSynced ? 1 : 0, // <<< CAMPO ADICIONADO AO MAPA
     };
   }
 
@@ -61,10 +93,11 @@ class CubagemArvore {
       identificador: map['identificador'],
       classe: map['classe'],
       exportada: map['exportada'] == 1,
-      alturaTotal: map['alturaTotal'] ?? 0,
+      isSynced: map['isSynced'] == 1, // <<< CAMPO ADICIONADO AO FACTORY
+      alturaTotal: map['alturaTotal']?.toDouble() ?? 0,
       tipoMedidaCAP: map['tipoMedidaCAP'] ?? 'fita',
-      valorCAP: map['valorCAP'] ?? 0,
-      alturaBase: map['alturaBase'] ?? 0,
+      valorCAP: map['valorCAP']?.toDouble() ?? 0,
+      alturaBase: map['alturaBase']?.toDouble() ?? 0,
     );
   }
 }
