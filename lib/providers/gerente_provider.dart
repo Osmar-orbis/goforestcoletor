@@ -1,4 +1,4 @@
-// lib/providers/gerente_provider.dart (VERSÃO COM IMPORTS CORRIGIDOS)
+// lib/providers/gerente_provider.dart (VERSÃO FINALMENTE CORRIGIDA)
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -6,6 +6,8 @@ import 'package:collection/collection.dart';
 import 'package:geoforestcoletor/models/parcela_model.dart';
 import 'package:geoforestcoletor/models/projeto_model.dart';
 import 'package:geoforestcoletor/services/gerente_service.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart'; // Import necessário
 
 class GerenteProvider with ChangeNotifier {
   final GerenteService _gerenteService = GerenteService();
@@ -25,15 +27,13 @@ class GerenteProvider with ChangeNotifier {
 
   // GETTERS INTELIGENTES PARA O DASHBOARD
 
-  /// Retorna a lista de parcelas, já filtrada pelo projeto selecionado.
   List<Parcela> get parcelasFiltradas {
     if (_selectedProjetoId == null) {
       return _parcelasSincronizadas;
     }
-    return _parcelasSincronizadas.where((p) => (p.toMap()['projetoId'] ?? -1) == _selectedProjetoId).toList();
+    return _parcelasSincronizadas.where((p) => p.toMap()['projetoId'] == _selectedProjetoId).toList();
   }
 
-  /// Agrupa o progresso das parcelas filtradas pelo nome da fazenda.
   Map<String, Map<String, int>> get progressoPorFazenda {
     final parcelas = parcelasFiltradas;
     if (parcelas.isEmpty) return {};
@@ -45,7 +45,6 @@ class GerenteProvider with ChangeNotifier {
     });
   }
 
-  /// Agrupa as parcelas filtradas por status para o gráfico de pizza.
   Map<StatusParcela, int> get progressoPorStatus {
     final parcelas = parcelasFiltradas;
     if (parcelas.isEmpty) return {};
@@ -55,26 +54,36 @@ class GerenteProvider with ChangeNotifier {
     });
   }
 
-  /// Agrupa as parcelas CONCLUÍDAS por data para o gráfico de linha.
-  Map<DateTime, int> get coletasPorDia {
+  Map<String, int> get coletasPorMes {
     final parcelas = parcelasFiltradas.where((p) => p.status == StatusParcela.concluida && p.dataColeta != null).toList();
     if (parcelas.isEmpty) return {};
     
-    final grupoPorDia = groupBy(parcelas, (Parcela p) {
+    final grupoPorMes = groupBy(parcelas, (Parcela p) {
       final data = p.dataColeta!;
-      return DateTime(data.year, data.month, data.day);
+      return DateFormat('MMM/yy', 'pt_BR').format(data);
     });
 
-    final mapaOrdenado = Map.fromEntries(
-      grupoPorDia.entries.map((e) => MapEntry(e.key, e.value.length)).toList()
-        ..sort((a, b) => a.key.compareTo(b.key))
-    );
-    return mapaOrdenado;
+    final mapaContagem = grupoPorMes.map((mes, lista) => MapEntry(mes, lista.length));
+    
+    final chavesOrdenadas = mapaContagem.keys.toList()..sort((a, b) {
+      try {
+        final dataA = DateFormat('MMM/yy', 'pt_BR').parse(a);
+        final dataB = DateFormat('MMM/yy', 'pt_BR').parse(b);
+        return dataA.compareTo(dataB);
+      } catch (e) {
+        return 0;
+      }
+    });
+
+    return { for (var key in chavesOrdenadas) key : mapaContagem[key]! };
   }
 
   // MÉTODOS PÚBLICOS
   GerenteProvider() {
-    iniciarMonitoramento();
+    // <<< CORREÇÃO: Inicializa a formatação de data ANTES de começar a monitorar >>>
+    initializeDateFormatting('pt_BR', null).then((_) {
+      iniciarMonitoramento();
+    });
   }
 
   void selectProjeto(int? projetoId) {

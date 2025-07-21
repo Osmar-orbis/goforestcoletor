@@ -1,9 +1,9 @@
-// lib/pages/gerente/gerente_main_page.dart (VERSÃO CORRETA E FUNCIONAL)
+// lib/pages/gerente/gerente_main_page.dart (VERSÃO CORRIGIDA)
 
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/controller/login_controller.dart';
 import 'package:geoforestcoletor/pages/gerente/gerente_dashboard_page.dart';
-import 'package:geoforestcoletor/pages/menu/home_page.dart'; // Importa a tela de coleta
+import 'package:geoforestcoletor/pages/menu/home_page.dart';
 import 'package:provider/provider.dart';
 
 class GerenteMainPage extends StatefulWidget {
@@ -16,13 +16,12 @@ class GerenteMainPage extends StatefulWidget {
 class _GerenteMainPageState extends State<GerenteMainPage> {
   int _selectedIndex = 0;
 
-  // Lista de telas que o gerente poderá acessar.
   static const List<Widget> _pages = <Widget>[
-    GerenteDashboardPage(),                 // Aba 0: Dashboard
-    HomePage(title: 'Modo Coleta de Campo'), // Aba 1: Acesso à coleta
+    GerenteDashboardPage(),
+    // <<< CORREÇÃO AQUI: Diga para a HomePage não mostrar sua própria AppBar >>>
+    HomePage(title: 'Modo Coleta de Campo', showAppBar: false),
   ];
 
-  // Lista de títulos para a AppBar
   static const List<String> _pageTitles = <String>[
     'Dashboard do Gestor',
     'Modo Coleta de Campo',
@@ -48,7 +47,6 @@ class _GerenteMainPageState extends State<GerenteMainPage> {
             },
           )
         ],
-        // Impede que haja uma seta de "voltar" desnecessária
         automaticallyImplyLeading: false, 
       ),
       body: IndexedStack(
@@ -57,12 +55,10 @@ class _GerenteMainPageState extends State<GerenteMainPage> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
-          // Item para a Aba 0
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard_outlined),
             label: 'Dashboard',
           ),
-          // Item para a Aba 1
           BottomNavigationBarItem(
             icon: Icon(Icons.park_outlined),
             label: 'Coleta',

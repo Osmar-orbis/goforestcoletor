@@ -1,4 +1,4 @@
-// lib/services/export_service.dart (VERSÃO COMPLETA E CORRIGIDA)
+// lib/services/export_service.dart (VERSÃO CORRIGIDA COM COLUNA 'Atividade')
 
 import 'dart:convert';
 import 'dart:io';
@@ -20,10 +20,9 @@ import 'package:flutter_archive/flutter_archive.dart';
 import 'package:geoforestcoletor/models/cubagem_arvore_model.dart';
 
 class ExportService {
-  final pdfService = PdfService(); // <<< INSTÂNCIA DO PDF SERVICE ADICIONADA
+  final pdfService = PdfService(); 
 
   Future<void> exportarDados(BuildContext context) async {
-    // ... (código existente, sem alterações)
     final dbHelper = DatabaseHelper.instance;
     final permissionService = PermissionService();
 
@@ -72,8 +71,9 @@ class ExportService {
       final projUTM = proj4.Projection.get('EPSG:$codigoEpsg')!;
 
       List<List<dynamic>> rows = [];
+      // <<< CORREÇÃO AQUI: Adicionado 'Atividade' no cabeçalho >>>
       rows.add([
-        'Lider_Equipe', 'Ajudantes', 'ID_Db_Parcela', 'Codigo_Fazenda', 'Fazenda', 'Talhao',
+        'Atividade', 'Lider_Equipe', 'Ajudantes', 'ID_Db_Parcela', 'Codigo_Fazenda', 'Fazenda', 'Talhao',
         'ID_Coleta_Parcela', 'Area_m2', 'Largura_m', 'Comprimento_m', 'Raio_m',
         'Observacao_Parcela', 'Easting', 'Northing', 'Data_Coleta',
         'Status_Parcela', 'Linha', 'Posicao_na_Linha', 'Fuste_Num',
@@ -94,8 +94,9 @@ class ExportService {
 
         final arvores = await dbHelper.getArvoresDaParcela(p.dbId!);
         if (arvores.isEmpty) {
+          // <<< CORREÇÃO AQUI: Adicionado 'IPC' no início da linha >>>
           rows.add([
-            nomeLider, nomesAjudantes, p.dbId, p.idFazenda, p.nomeFazenda, p.nomeTalhao,
+            'IPC', nomeLider, nomesAjudantes, p.dbId, p.idFazenda, p.nomeFazenda, p.nomeTalhao,
             p.idParcela, p.areaMetrosQuadrados, p.largura, p.comprimento,
             p.raio, p.observacao, easting, northing,
             p.dataColeta?.toIso8601String(), p.status.name, null, null,
@@ -106,8 +107,9 @@ class ExportService {
           for (final a in arvores) {
             String key = '${a.linha}-${a.posicaoNaLinha}';
             fusteCounter[key] = (fusteCounter[key] ?? 0) + 1;
+            // <<< CORREÇÃO AQUI: Adicionado 'IPC' no início da linha >>>
             rows.add([
-              nomeLider, nomesAjudantes, p.dbId, p.idFazenda, p.nomeFazenda, p.nomeTalhao,
+              'IPC', nomeLider, nomesAjudantes, p.dbId, p.idFazenda, p.nomeFazenda, p.nomeTalhao,
               p.idParcela, p.areaMetrosQuadrados, p.largura, p.comprimento,
               p.raio, p.observacao, easting, northing,
               p.dataColeta?.toIso8601String(), p.status.name, a.linha,
@@ -147,7 +149,6 @@ class ExportService {
     }
   }
 
-  // <<< FUNÇÃO RESTAURADA >>>
   Future<void> exportarAnaliseTalhaoCsv({
     required BuildContext context,
     required Talhao talhao,
@@ -231,9 +232,7 @@ class ExportService {
     }
   }
 
-  // O resto do arquivo permanece igual
-  // ...
-    Future<void> exportarTodasAsParcelasBackup(BuildContext context) async {
+  Future<void> exportarTodasAsParcelasBackup(BuildContext context) async {
     final dbHelper = DatabaseHelper.instance;
     final permissionService = PermissionService();
 
@@ -282,8 +281,9 @@ class ExportService {
       final projUTM = proj4.Projection.get('EPSG:$codigoEpsg')!;
 
       List<List<dynamic>> rows = [];
+      // <<< CORREÇÃO AQUI: Adicionado 'Atividade' no cabeçalho >>>
       rows.add([
-        'Lider_Equipe', 'Ajudantes', 'ID_Db_Parcela', 'Codigo_Fazenda', 'Fazenda', 'Talhao',
+        'Atividade', 'Lider_Equipe', 'Ajudantes', 'ID_Db_Parcela', 'Codigo_Fazenda', 'Fazenda', 'Talhao',
         'ID_Coleta_Parcela', 'Area_m2', 'Largura_m', 'Comprimento_m', 'Raio_m',
         'Observacao_Parcela', 'Easting', 'Northing', 'Data_Coleta',
         'Status_Parcela', 'Linha', 'Posicao_na_Linha', 'Fuste_Num',
@@ -301,8 +301,9 @@ class ExportService {
 
         final arvores = await dbHelper.getArvoresDaParcela(p.dbId!);
         if (arvores.isEmpty) {
+          // <<< CORREÇÃO AQUI: Adicionado 'IPC' no início da linha >>>
           rows.add([
-            nomeLider, nomesAjudantes, p.dbId, p.idFazenda, p.nomeFazenda, p.nomeTalhao,
+            'IPC', nomeLider, nomesAjudantes, p.dbId, p.idFazenda, p.nomeFazenda, p.nomeTalhao,
             p.idParcela, p.areaMetrosQuadrados, p.largura, p.comprimento,
             p.raio, p.observacao, easting, northing,
             p.dataColeta?.toIso8601String(), p.status.name, null, null,
@@ -313,8 +314,9 @@ class ExportService {
           for (final a in arvores) {
             String key = '${a.linha}-${a.posicaoNaLinha}';
             fusteCounter[key] = (fusteCounter[key] ?? 0) + 1;
+            // <<< CORREÇÃO AQUI: Adicionado 'IPC' no início da linha >>>
             rows.add([
-              nomeLider, nomesAjudantes, p.dbId, p.idFazenda, p.nomeFazenda, p.nomeTalhao,
+              'IPC', nomeLider, nomesAjudantes, p.dbId, p.idFazenda, p.nomeFazenda, p.nomeTalhao,
               p.idParcela, p.areaMetrosQuadrados, p.largura, p.comprimento,
               p.raio, p.observacao, easting, northing,
               p.dataColeta?.toIso8601String(), p.status.name, a.linha,
@@ -634,8 +636,9 @@ class ExportService {
     }
 
     List<List<dynamic>> rows = [];
+    // <<< CORREÇÃO AQUI: Adicionado 'Atividade' no cabeçalho >>>
     rows.add([
-      'id_db_arvore', 'id_fazenda', 'fazenda', 'talhao',
+      'Atividade', 'id_db_arvore', 'id_fazenda', 'fazenda', 'talhao',
       'identificador_arvore', 'classe', 'altura_total_m', 'tipo_medida_cap',
       'valor_cap', 'altura_base_m', 'altura_medicao_secao_m',
       'circunferencia_secao_cm', 'casca1_mm', 'casca2_mm', 'dsc_cm'
@@ -649,16 +652,18 @@ class ExportService {
       }
       final secoes = await dbHelper.getSecoesPorArvoreId(arvore.id!);
       if (secoes.isEmpty) {
+        // <<< CORREÇÃO AQUI: Adicionado 'CUB' no início da linha >>>
         rows.add([
-          arvore.id, arvore.idFazenda, arvore.nomeFazenda, arvore.nomeTalhao,
+          'CUB', arvore.id, arvore.idFazenda, arvore.nomeFazenda, arvore.nomeTalhao,
           arvore.identificador, arvore.classe, arvore.alturaTotal,
           arvore.tipoMedidaCAP, arvore.valorCAP, arvore.alturaBase,
           null, null, null, null, null
         ]);
       } else {
         for (var secao in secoes) {
+          // <<< CORREÇÃO AQUI: Adicionado 'CUB' no início da linha >>>
           rows.add([
-            arvore.id, arvore.idFazenda, arvore.nomeFazenda, arvore.nomeTalhao,
+            'CUB', arvore.id, arvore.idFazenda, arvore.nomeFazenda, arvore.nomeTalhao,
             arvore.identificador, arvore.classe, arvore.alturaTotal,
             arvore.tipoMedidaCAP, arvore.valorCAP, arvore.alturaBase,
             secao.alturaMedicao, secao.circunferencia, secao.casca1_mm,

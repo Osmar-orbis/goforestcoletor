@@ -1,12 +1,13 @@
-// lib/pages/gerente/gerente_dashboard_page.dart (VERSÃO COMPLETA COM TODOS OS GRÁFICOS)
+// lib/pages/gerente/gerente_dashboard_page.dart (VERSÃO CORRIGIDA)
 
+import 'package:collection/collection.dart'; // <<< ADICIONE ESTE IMPORT
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/models/projeto_model.dart';
 import 'package:geoforestcoletor/providers/gerente_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:geoforestcoletor/models/parcela_model.dart';
-import 'package:intl/intl.dart';
+
 
 class GerenteDashboardPage extends StatelessWidget {
   const GerenteDashboardPage({super.key});
@@ -47,8 +48,9 @@ class GerenteDashboardPage extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               
-              if (provider.coletasPorDia.isNotEmpty)
-                _buildLineChartCard(context, provider.coletasPorDia),
+              // <<< MUDANÇA 1: Usar o novo getter 'coletasPorMes' >>>
+              if (provider.coletasPorMes.isNotEmpty)
+                _buildLineChartCard(context, provider.coletasPorMes),
               const SizedBox(height: 24),
 
               if (provider.progressoPorFazenda.isNotEmpty) ...[
@@ -157,6 +159,7 @@ class GerenteDashboardPage extends StatelessWidget {
     ]);
   }
 
+  // <<< MUDANÇA 2: Ajuste no rótulo do gráfico de barras >>>
   Widget _buildBarChart(BuildContext context, Map<String, Map<String, int>> data) {
     final entries = data.entries.toList();
     return BarChart(
@@ -181,8 +184,9 @@ class GerenteDashboardPage extends StatelessWidget {
           bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (double value, TitleMeta meta) {
             final index = value.toInt();
             if (index >= entries.length) return const SizedBox.shrink();
+            // Abrevia o nome da fazenda para 3 caracteres para evitar sobreposição
             final text = entries[index].key.length > 3 ? entries[index].key.substring(0, 3) : entries[index].key;
-            return SideTitleWidget(axisSide: meta.axisSide, space: 4, child: Text(text, style: const TextStyle(fontSize: 10)));
+            return SideTitleWidget(axisSide: meta.axisSide, space: 4, child: Text(text, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)));
           }, reservedSize: 32)),
           leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -197,8 +201,10 @@ class GerenteDashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildLineChartCard(BuildContext context, Map<DateTime, int> data) {
-    final spots = data.entries.map((e) => FlSpot(e.key.millisecondsSinceEpoch.toDouble(), e.value.toDouble())).toList();
+  // <<< MUDANÇA 3: Ajuste completo no gráfico de linha >>>
+  Widget _buildLineChartCard(BuildContext context, Map<String, int> data) {
+    // Usa o pacote 'collection' para ter acesso ao 'mapIndexed'
+    final spots = data.entries.mapIndexed((index, e) => FlSpot(index.toDouble(), e.value.toDouble())).toList();
     
     return Card(
       elevation: 2,
@@ -206,7 +212,7 @@ class GerenteDashboardPage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
         child: Column(
           children: [
-            Text("Coletas Concluídas por Dia", style: Theme.of(context).textTheme.titleLarge),
+            Text("Coletas Concluídas por Mês", style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 20),
             SizedBox(
               height: 200,
@@ -216,9 +222,11 @@ class GerenteDashboardPage extends StatelessWidget {
                   titlesData: FlTitlesData(
                     rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, interval: Duration(days: 1).inMilliseconds.toDouble(), getTitlesWidget: (value, meta) {
-                      final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                      return SideTitleWidget(axisSide: meta.axisSide, child: Text(DateFormat('dd/MM').format(date), style: const TextStyle(fontSize: 10)));
+                    bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, interval: 1, getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+                      if (index >= data.keys.length) return const SizedBox.shrink();
+                      // Usa a chave do mapa (ex: "Jul/25") como rótulo
+                      return SideTitleWidget(axisSide: meta.axisSide, child: Text(data.keys.elementAt(index), style: const TextStyle(fontSize: 10)));
                     }, reservedSize: 30)),
                   ),
                   borderData: FlBorderData(show: true),

@@ -1,4 +1,4 @@
-// lib/pages/menu/home_page.dart (VERSÃO COM FLUXO DE SELEÇÃO DE PROJETO)
+// lib/pages/menu/home_page.dart (VERSÃO CORRIGIDA)
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -16,8 +16,16 @@ import 'package:geoforestcoletor/widgets/menu_card.dart';
 import 'package:geoforestcoletor/services/sync_service.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, required this.title});
   final String title;
+  // <<< MUDANÇA 1: Adicionar a variável para controlar a AppBar >>>
+  final bool showAppBar;
+
+  const HomePage({
+    super.key,
+    required this.title,
+    // <<< MUDANÇA 2: Definir valor padrão como true >>>
+    this.showAppBar = true,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -27,7 +35,6 @@ class _HomePageState extends State<HomePage> {
   bool _isSyncing = false;
 
   Future<void> _executarSincronizacao() async {
-    // ... (esta função não muda)
     if (_isSyncing) return;
     setState(() => _isSyncing = true);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -56,7 +63,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
   
-  // <<< LÓGICA DE IMPORTAÇÃO RESTAURADA PARA NAVEGAR PARA A LISTA DE PROJETOS >>>
   void _mostrarDialogoImportacao(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -75,7 +81,7 @@ class _HomePageState extends State<HomePage> {
               Navigator.push(context, MaterialPageRoute(
                 builder: (context) => const ListaProjetosPage(
                   title: 'Importar para o Projeto...',
-                  isImporting: true, // Ativa o modo de importação
+                  isImporting: true,
                 ),
               ));
             },
@@ -85,7 +91,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // O resto do arquivo (build, _abrirAnalista, _mostrarDialogoExportacao, etc.) não muda.
   void _abrirAnalistaDeDados(BuildContext context) {
     Navigator.push(
       context,
@@ -230,7 +235,8 @@ class _HomePageState extends State<HomePage> {
     final bool podeAnalisar = licenseProvider.licenseData?.features['analise'] ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      // <<< MUDANÇA 3: Construir a AppBar apenas se showAppBar for true >>>
+      appBar: widget.showAppBar ? AppBar(title: Text(widget.title)) : null,
       body: Padding(
         padding: const EdgeInsets.all(12.0),
         child: GridView.count(
