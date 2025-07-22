@@ -1,11 +1,12 @@
 // lib/models/projeto_model.dart
 
-class Projeto { // A palavra "copyWith" foi removida daqui
+class Projeto {
   final int? id;
   final String nome;
   final String empresa;
   final String responsavel;
   final DateTime dataCriacao;
+  final String status; // <<< ADICIONADO
 
   Projeto({
     this.id,
@@ -13,15 +14,16 @@ class Projeto { // A palavra "copyWith" foi removida daqui
     required this.empresa,
     required this.responsavel,
     required this.dataCriacao,
+    this.status = 'ativo', // <<< ADICIONADO (com valor padrão)
   });
 
-  // >>> MÉTODO CORRIGIDO E ADICIONADO AQUI <<<
   Projeto copyWith({
     int? id,
     String? nome,
     String? empresa,
     String? responsavel,
     DateTime? dataCriacao,
+    String? status, // <<< ADICIONADO
   }) {
     return Projeto(
       id: id ?? this.id,
@@ -29,6 +31,7 @@ class Projeto { // A palavra "copyWith" foi removida daqui
       empresa: empresa ?? this.empresa,
       responsavel: responsavel ?? this.responsavel,
       dataCriacao: dataCriacao ?? this.dataCriacao,
+      status: status ?? this.status, // <<< ADICIONADO
     );
   }
 
@@ -39,6 +42,7 @@ class Projeto { // A palavra "copyWith" foi removida daqui
       'empresa': empresa,
       'responsavel': responsavel,
       'dataCriacao': dataCriacao.toIso8601String(),
+      'status': status, // <<< ADICIONADO
     };
   }
 
@@ -49,6 +53,7 @@ class Projeto { // A palavra "copyWith" foi removida daqui
       empresa: map['empresa'],
       responsavel: map['responsavel'],
       dataCriacao: DateTime.parse(map['dataCriacao']),
+      status: map['status'] ?? 'ativo', // <<< ADICIONADO
     );
   }
 }

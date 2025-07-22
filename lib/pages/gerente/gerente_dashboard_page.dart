@@ -1,6 +1,6 @@
-// lib/pages/gerente/gerente_dashboard_page.dart (VERSÃO CORRIGIDA)
+// lib/pages/gerente/gerente_dashboard_page.dart (VERSÃO COM BOTÃO PARA O MAPA)
 
-import 'package:collection/collection.dart'; // <<< ADICIONE ESTE IMPORT
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/models/projeto_model.dart';
 import 'package:geoforestcoletor/providers/gerente_provider.dart';
@@ -26,41 +26,52 @@ class GerenteDashboardPage extends StatelessWidget {
 
         final progressoGeral = provider.parcelasFiltradas.isNotEmpty ? provider.parcelasFiltradas.where((p) => p.status == StatusParcela.concluida).length / provider.parcelasFiltradas.length : 0.0;
 
-        return RefreshIndicator(
-          onRefresh: () async => context.read<GerenteProvider>().iniciarMonitoramento(),
-          child: ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              _buildProjectFilter(context, provider),
-              const SizedBox(height: 16),
-              
-              if (provider.progressoPorStatus.isNotEmpty)
-                _buildPieChartCard(context, provider.progressoPorStatus),
-              const SizedBox(height: 16),
-              
-              _buildSummaryCard(
-                context: context,
-                title: 'Progresso Geral',
-                value: '${(progressoGeral * 100).toStringAsFixed(0)}%',
-                subtitle: '${provider.parcelasFiltradas.where((p) => p.status == StatusParcela.concluida).length} de ${provider.parcelasFiltradas.length} parcelas concluídas',
-                progress: progressoGeral,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 24),
-              
-              // <<< MUDANÇA 1: Usar o novo getter 'coletasPorMes' >>>
-              if (provider.coletasPorMes.isNotEmpty)
-                _buildLineChartCard(context, provider.coletasPorMes),
-              const SizedBox(height: 24),
-
-              if (provider.progressoPorFazenda.isNotEmpty) ...[
-                Text('Desempenho por Fazenda', style: Theme.of(context).textTheme.titleLarge),
-                const Divider(),
-                const SizedBox(height: 8),
-                SizedBox(height: 250, child: Card(elevation: 2, child: Padding(padding: const EdgeInsets.fromLTRB(8, 16, 8, 8), child: _buildBarChart(context, provider.progressoPorFazenda)))),
+        // <<< MUDANÇA 1: Adicionado o Scaffold para abrigar o FloatingActionButton >>>
+        return Scaffold(
+          body: RefreshIndicator(
+            onRefresh: () async => context.read<GerenteProvider>().iniciarMonitoramento(),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0), // Adiciona padding no final para não cobrir o último card
+              children: [
+                _buildProjectFilter(context, provider),
+                const SizedBox(height: 16),
+                
+                if (provider.progressoPorStatus.isNotEmpty)
+                  _buildPieChartCard(context, provider.progressoPorStatus),
+                const SizedBox(height: 16),
+                
+                _buildSummaryCard(
+                  context: context,
+                  title: 'Progresso Geral',
+                  value: '${(progressoGeral * 100).toStringAsFixed(0)}%',
+                  subtitle: '${provider.parcelasFiltradas.where((p) => p.status == StatusParcela.concluida).length} de ${provider.parcelasFiltradas.length} parcelas concluídas',
+                  progress: progressoGeral,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(height: 24),
+                
+                if (provider.coletasPorMes.isNotEmpty)
+                  _buildLineChartCard(context, provider.coletasPorMes),
+                const SizedBox(height: 24),
+
+                if (provider.progressoPorFazenda.isNotEmpty) ...[
+                  Text('Desempenho por Fazenda', style: Theme.of(context).textTheme.titleLarge),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  SizedBox(height: 250, child: Card(elevation: 2, child: Padding(padding: const EdgeInsets.fromLTRB(8, 16, 8, 8), child: _buildBarChart(context, provider.progressoPorFazenda)))),
+                  const SizedBox(height: 24),
+                ],
               ],
-            ],
+            ),
+          ),
+          // <<< MUDANÇA 2: Adicionado o FloatingActionButton >>>
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () {
+              // Navega para a nova rota que vamos criar no próximo passo
+              Navigator.pushNamed(context, '/gerente_map');
+            },
+            icon: const Icon(Icons.map_outlined),
+            label: const Text('Mapa Geral'),
           ),
         );
       },
@@ -126,7 +137,7 @@ class GerenteDashboardPage extends StatelessWidget {
                   sectionsSpace: 2,
                   centerSpaceRadius: 40,
                   sections: data.entries.map((entry) {
-                    final percentage = (entry.value / totalValue) * 100;
+                    final percentage = totalValue > 0 ? (entry.value / totalValue) * 100 : 0;
                     return PieChartSectionData(
                       color: entry.key.cor,
                       value: entry.value.toDouble(),
@@ -159,7 +170,6 @@ class GerenteDashboardPage extends StatelessWidget {
     ]);
   }
 
-  // <<< MUDANÇA 2: Ajuste no rótulo do gráfico de barras >>>
   Widget _buildBarChart(BuildContext context, Map<String, Map<String, int>> data) {
     final entries = data.entries.toList();
     return BarChart(
@@ -184,7 +194,6 @@ class GerenteDashboardPage extends StatelessWidget {
           bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (double value, TitleMeta meta) {
             final index = value.toInt();
             if (index >= entries.length) return const SizedBox.shrink();
-            // Abrevia o nome da fazenda para 3 caracteres para evitar sobreposição
             final text = entries[index].key.length > 3 ? entries[index].key.substring(0, 3) : entries[index].key;
             return SideTitleWidget(axisSide: meta.axisSide, space: 4, child: Text(text, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)));
           }, reservedSize: 32)),
@@ -201,9 +210,7 @@ class GerenteDashboardPage extends StatelessWidget {
     );
   }
 
-  // <<< MUDANÇA 3: Ajuste completo no gráfico de linha >>>
   Widget _buildLineChartCard(BuildContext context, Map<String, int> data) {
-    // Usa o pacote 'collection' para ter acesso ao 'mapIndexed'
     final spots = data.entries.mapIndexed((index, e) => FlSpot(index.toDouble(), e.value.toDouble())).toList();
     
     return Card(
@@ -225,7 +232,6 @@ class GerenteDashboardPage extends StatelessWidget {
                     bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, interval: 1, getTitlesWidget: (value, meta) {
                       final index = value.toInt();
                       if (index >= data.keys.length) return const SizedBox.shrink();
-                      // Usa a chave do mapa (ex: "Jul/25") como rótulo
                       return SideTitleWidget(axisSide: meta.axisSide, child: Text(data.keys.elementAt(index), style: const TextStyle(fontSize: 10)));
                     }, reservedSize: 30)),
                   ),

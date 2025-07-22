@@ -1,4 +1,4 @@
-// lib/data/datasources/local/database_helper.dart (VERSÃO FINAL E COMPLETA)
+// lib/data/datasources/local/database_helper.dart (VERSÃO CORRIGIDA E COMPLETA)
 
 import 'dart:convert';
 import 'package:csv/csv.dart';
@@ -59,7 +59,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       join(await getDatabasesPath(), 'geoforestcoletor.db'),
-      version: 26,
+      version: 27, // <<< CORREÇÃO 1: Versão atualizada para 27
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -75,9 +75,11 @@ class DatabaseHelper {
         nome TEXT NOT NULL,
         empresa TEXT NOT NULL,
         responsavel TEXT NOT NULL,
-        dataCriacao TEXT NOT NULL
+        dataCriacao TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'ativo' -- <<< CORREÇÃO 2: Coluna status adicionada
       )
     ''');
+    // ... O resto do seu método _onCreate continua aqui...
     await db.execute('''
       CREATE TABLE atividades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -218,16 +220,31 @@ class DatabaseHelper {
         case 26:
           await db.execute('ALTER TABLE cubagens_arvores ADD COLUMN isSynced INTEGER DEFAULT 0 NOT NULL');
           break;
+        case 27: // <<< CORREÇÃO 3: Adicionado o case para a versão 27
+          await db.execute("ALTER TABLE projetos ADD COLUMN status TEXT NOT NULL DEFAULT 'ativo'");
+          break;
       }
     }
   }
 
   // --- MÉTODOS CRUD: HIERARQUIA ---
   Future<int> insertProjeto(Projeto p) async => await (await database).insert('projetos', p.toMap());
+
+  // <<< CORREÇÃO 4: Função modificada para filtrar por status ativo >>>
   Future<List<Projeto>> getTodosProjetos() async {
-    final maps = await (await database).query('projetos', orderBy: 'dataCriacao DESC');
+    final db = await database;
+    // Filtra para pegar apenas projetos com status 'ativo'
+    final maps = await db.query('projetos', where: 'status = ?', whereArgs: ['ativo'], orderBy: 'dataCriacao DESC');
     return List.generate(maps.length, (i) => Projeto.fromMap(maps[i]));
   }
+
+  Future<List<Projeto>> getTodosOsProjetosParaGerente() async {
+  final db = await database;
+  // A mesma consulta, mas sem o filtro de status
+  final maps = await db.query('projetos', orderBy: 'dataCriacao DESC');
+  return List.generate(maps.length, (i) => Projeto.fromMap(maps[i]));
+}
+  
   Future<Projeto?> getProjetoById(int id) async {
     final db = await database;
     final maps = await db.query('projetos', where: 'id = ?', whereArgs: [id]);
@@ -235,6 +252,8 @@ class DatabaseHelper {
     return null;
   }
   Future<void> deleteProjeto(int id) async => await (await database).delete('projetos', where: 'id = ?', whereArgs: [id]);
+  
+  // ... O restante do seu arquivo continua inalterado ...
   Future<int> insertAtividade(Atividade a) async => await (await database).insert('atividades', a.toMap());
   Future<List<Atividade>> getAtividadesDoProjeto(int projetoId) async {
     final maps = await (await database).query('atividades', where: 'projetoId = ?', whereArgs: [projetoId], orderBy: 'dataCriacao DESC');

@@ -1,4 +1,4 @@
-// lib/main.dart (VERSÃO FINAL COM IMPORT CORRETO)
+// lib/main.dart (VERSÃO COM A NOVA ROTA DO MAPA DO GERENTE)
 
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -21,11 +21,11 @@ import 'package:geoforestcoletor/pages/projetos/lista_projetos_page.dart';
 import 'package:geoforestcoletor/pages/menu/splash_page.dart';
 import 'package:geoforestcoletor/providers/license_provider.dart';
 import 'package:geoforestcoletor/pages/menu/paywall_page.dart';
-// =======================================================================
-// <<< IMPORT CORRETO E VERIFICADO >>>
 import 'package:geoforestcoletor/pages/gerente/gerente_main_page.dart';
 import 'package:geoforestcoletor/providers/gerente_provider.dart';
-// =======================================================================
+
+// <<< MUDANÇA 1: Importar o novo arquivo de mapa que vamos criar >>>
+import 'package:geoforestcoletor/pages/gerente/gerente_map_page.dart';
 
 
 // PONTO DE ENTRADA PRINCIPAL DO APP
@@ -135,6 +135,8 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginPage(),
           '/paywall': (context) => const PaywallPage(),
           '/gerente_home': (context) => const GerenteMainPage(),
+          // <<< MUDANÇA 2: Registrar a nova rota para o mapa do gerente >>>
+          '/gerente_map': (context) => const GerenteMapPage(),
         },
         navigatorObservers: [MapProvider.routeObserver],
         builder: (context, child) {
@@ -252,4 +254,3 @@ class ErrorScreen extends StatelessWidget {
     );
   }
 }
-

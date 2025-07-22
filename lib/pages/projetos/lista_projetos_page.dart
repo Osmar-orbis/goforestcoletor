@@ -1,23 +1,28 @@
-// lib/pages/projetos/lista_projetos_page.dart (VERSÃO COM SELEÇÃO DE PROJETO PARA IMPORTAÇÃO)
+// lib/pages/projetos/lista_projetos_page.dart (VERSÃO FINAL COM GERENCIAMENTO E IMPORTAÇÃO)
 
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+// Imports do projeto
 import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
 import 'package:geoforestcoletor/models/projeto_model.dart';
 import 'package:geoforestcoletor/pages/projetos/detalhes_projeto_page.dart';
+import 'package:geoforestcoletor/providers/license_provider.dart';
+import 'package:geoforestcoletor/services/sync_service.dart';
 import 'form_projeto_page.dart';
 
 class ListaProjetosPage extends StatefulWidget {
   final String title;
-  final bool isImporting; // <<< PARÂMETRO RESTAURADO
+  final bool isImporting;
 
   const ListaProjetosPage({
     super.key,
     required this.title,
-    this.isImporting = false, // Valor padrão é false
+    this.isImporting = false,
   });
 
   @override
@@ -32,15 +37,32 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   bool _isSelectionMode = false;
   final Set<int> _selectedProjetos = {};
   
+  // Variável para saber se o usuário tem permissões de gerente
+  bool _isGerente = false;
+
   @override
   void initState() {
     super.initState();
-    _carregarProjetos();
+    // A verificação do cargo é feita antes de carregar os projetos
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkUserRoleAndLoadProjects();
+    });
   }
 
-  Future<void> _carregarProjetos() async {
-    setState(() => _isLoading = true);
-    final data = await dbHelper.getTodosProjetos();
+  /// Verifica o cargo do usuário logado e carrega a lista de projetos apropriada.
+  Future<void> _checkUserRoleAndLoadProjects() async {
+    // Usa o Provider para obter os dados da licença, que contém o cargo
+    final licenseProvider = context.read<LicenseProvider>();
+    setState(() {
+      _isGerente = licenseProvider.licenseData?.cargo == 'gerente';
+      _isLoading = true;
+    });
+
+    // Carrega a lista de projetos com base no cargo
+    final data = _isGerente
+        ? await dbHelper.getTodosOsProjetosParaGerente() // Gerente vê todos (ativos e arquivados)
+        : await dbHelper.getTodosProjetos();             // Equipe de campo vê apenas os ativos
+
     if (mounted) {
       setState(() {
         projetos = data;
@@ -49,7 +71,64 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
     }
   }
 
-  // <<< NOVA FUNÇÃO PARA INICIAR A IMPORTAÇÃO APÓS SELECIONAR UM PROJETO >>>
+  /// Alterna o status de um projeto entre 'ativo' e 'arquivado'.
+  /// Esta função só é acessível pela interface do gerente.
+  Future<void> _toggleArchiveStatus(Projeto projeto) async {
+    final novoStatus = projeto.status == 'ativo' ? 'arquivado' : 'ativo';
+    final acao = novoStatus == 'arquivado' ? 'Arquivar' : 'Reativar';
+
+    final bool? confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('$acao Projeto'),
+        content: Text('Tem certeza que deseja $acao o projeto "${projeto.nome}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: novoStatus == 'arquivado' ? Colors.orange.shade700 : Colors.green.shade600,
+            ),
+            child: Text(acao),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar == true && mounted) {
+      setState(() => _isLoading = true);
+      try {
+        // 1. Atualiza o objeto no banco de dados local primeiro
+        final projetoAtualizado = projeto.copyWith(status: novoStatus);
+        final db = await dbHelper.database;
+        await db.update('projetos', projetoAtualizado.toMap(), where: 'id = ?', whereArgs: [projeto.id]);
+
+        // 2. Chama o serviço para replicar a mudança no Firebase
+        final syncService = SyncService();
+        await syncService.atualizarStatusProjetoNaFirebase(projeto.id!.toString(), novoStatus);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Projeto ${projeto.nome} foi atualizado para "$novoStatus".'), backgroundColor: Colors.green),
+        );
+        
+        // 3. Recarrega a lista da tela para refletir a mudança visual
+        await _checkUserRoleAndLoadProjects();
+
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao atualizar status: $e'), backgroundColor: Colors.red),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    }
+  }
+
+  /// Inicia o fluxo de seleção de arquivo e importação para um projeto específico.
   Future<void> _iniciarImportacao(Projeto projeto) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -93,7 +172,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
             actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
           ),
         );
-        // Fecha a tela de seleção de projetos após a importação
+        // Fecha a tela de seleção de projetos após a importação ser concluída
         Navigator.of(context).pop(); 
       }
     } catch (e) {
@@ -106,7 +185,6 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
     }
   }
 
-  // ... (funções de seleção e exclusão permanecem as mesmas)
   void _clearSelection() {
     if (mounted) {
       setState(() {
@@ -150,7 +228,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
         await dbHelper.deleteProjeto(id);
       }
       _clearSelection();
-      await _carregarProjetos();
+      await _checkUserRoleAndLoadProjects();
     }
   }
 
@@ -164,13 +242,13 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
       ),
     );
     if (projetoEditado == true && mounted) {
-      _carregarProjetos();
+      _checkUserRoleAndLoadProjects();
     }
   }
   
   void _navegarParaDetalhes(Projeto projeto) {
     Navigator.push(context, MaterialPageRoute(builder: (context) => DetalhesProjetoPage(projeto: projeto)))
-      .then((_) => _carregarProjetos());
+      .then((_) => _checkUserRoleAndLoadProjects());
   }
 
   @override
@@ -181,12 +259,12 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
           ? const Center(child: CircularProgressIndicator())
           : projetos.isEmpty
               ? _buildEmptyState()
-              : _buildListView(), // <<< MÉTODO DE CONSTRUÇÃO DA LISTA UNIFICADO
-      floatingActionButton: widget.isImporting ? null : _buildAddProjectButton(),
+              : _buildListView(),
+      // O botão de adicionar só aparece para gerentes e quando não está no modo de importação
+      floatingActionButton: (widget.isImporting || !_isGerente) ? null : _buildAddProjectButton(),
     );
   }
   
-  // <<< O MÉTODO buildListView AGORA LIDA COM AMBOS OS CASOS >>>
   Widget _buildListView() {
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 80),
@@ -194,12 +272,14 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
       itemBuilder: (context, index) {
         final projeto = projetos[index];
         final isSelected = _selectedProjetos.contains(projeto.id!);
+        final isArchived = projeto.status == 'arquivado';
 
         return Slidable(
           key: ValueKey(projeto.id),
-          startActionPane: widget.isImporting ? null : ActionPane(
+          // Ações de deslizar só estão disponíveis para o gerente e fora do modo de importação
+          startActionPane: (_isGerente && !widget.isImporting) ? ActionPane(
             motion: const DrawerMotion(),
-            extentRatio: 0.25,
+            extentRatio: 0.5, // Aumenta o espaço para dois botões
             children: [
               SlidableAction(
                 onPressed: (_) => _navegarParaEdicao(projeto),
@@ -208,10 +288,18 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
                 icon: Icons.edit_outlined,
                 label: 'Editar',
               ),
+              SlidableAction(
+                onPressed: (_) => _toggleArchiveStatus(projeto),
+                backgroundColor: isArchived ? Colors.green.shade600 : Colors.orange.shade700,
+                foregroundColor: Colors.white,
+                icon: isArchived ? Icons.unarchive_outlined : Icons.archive_outlined,
+                label: isArchived ? 'Reativar' : 'Arquivar',
+              ),
             ],
-          ),
+          ) : null,
           child: Card(
-            color: isSelected ? Colors.lightBlue.shade100 : null,
+            // Estilo visual para projetos arquivados e selecionados
+            color: isArchived ? Colors.grey.shade300 : (isSelected ? Colors.lightBlue.shade100 : null),
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: ListTile(
               onTap: () {
@@ -223,12 +311,10 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
                   _navegarParaDetalhes(projeto);
                 }
               },
-              onLongPress: widget.isImporting ? null : () => _toggleSelection(projeto.id!),
+              onLongPress: (_isGerente && !widget.isImporting) ? () => _toggleSelection(projeto.id!) : null,
               leading: Icon(
-                widget.isImporting
-                    ? Icons.file_download_done_outlined
-                    : (isSelected ? Icons.check_circle : Icons.folder_outlined),
-                color: Theme.of(context).primaryColor,
+                isSelected ? Icons.check_circle : (isArchived ? Icons.archive_rounded : Icons.folder_outlined),
+                color: isArchived ? Colors.grey.shade700 : Theme.of(context).primaryColor,
               ),
               title: Text(projeto.nome, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text('Responsável: ${projeto.responsavel}'),
@@ -268,7 +354,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
           const Icon(Icons.folder_off_outlined, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
           const Text('Nenhum projeto encontrado.', style: TextStyle(fontSize: 18)),
-          if (!widget.isImporting)
+          if (!widget.isImporting && _isGerente)
             const Text('Use o botão "+" para adicionar um novo.', style: TextStyle(color: Colors.grey)),
         ],
       ),
@@ -280,7 +366,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
       onPressed: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const FormProjetoPage()))
           .then((criado) {
-            if (criado == true) _carregarProjetos();
+            if (criado == true) _checkUserRoleAndLoadProjects();
           });
       },
       tooltip: 'Adicionar Projeto',
