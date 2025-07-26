@@ -49,23 +49,38 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   }
 
   Future<void> _checkUserRoleAndLoadProjects() async {
-    final licenseProvider = context.read<LicenseProvider>();
-    setState(() {
-      _isGerente = licenseProvider.licenseData?.cargo == 'gerente';
-      _isLoading = true;
-    });
+  // 1. Pega o provider para ter acesso aos dados da licença
+  final licenseProvider = context.read<LicenseProvider>();
 
-    final data = _isGerente
-        ? await dbHelper.getTodosOsProjetosParaGerente()
-        : await dbHelper.getTodosProjetos();
+  setState(() {
+    _isGerente = licenseProvider.licenseData?.cargo == 'gerente';
+    _isLoading = true;
+  });
 
-    if (mounted) {
-      setState(() {
-        projetos = data;
-        _isLoading = false;
-      });
-    }
+  // Declara a variável que vai guardar o resultado
+  List<Projeto> data;
+
+  if (_isGerente) {
+    // A lógica para o Gerente não muda, ele continua vendo tudo.
+    data = await dbHelper.getTodosOsProjetosParaGerente();
+  } else {
+    // Lógica para a Equipe (a parte que corrigimos)
+    
+    // 2. Pega o ID da licença do usuário logado
+    //    (Certifique-se de que seu LicenseData tem o campo 'id')
+    final licenseId = licenseProvider.licenseData!.id; 
+
+    // 3. Chama a nova função 'getProjetos' passando o ID como filtro
+    data = await dbHelper.getTodosProjetos(licenseId);
   }
+
+  if (mounted) {
+    setState(() {
+      projetos = data;
+      _isLoading = false;
+    });
+  }
+}
 
   // A função de arquivar continua sendo exclusiva do gerente.
   Future<void> _toggleArchiveStatus(Projeto projeto) async {

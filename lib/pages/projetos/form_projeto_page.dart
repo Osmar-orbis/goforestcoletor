@@ -1,11 +1,14 @@
-// lib/pages/projetos/form_projeto_page.dart (VERSÃO COM SUPORTE PARA EDIÇÃO)
+// lib/pages/projetos/form_projeto_page.dart (VERSÃO FINAL E CORRIGIDA)
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+// Imports necessários
 import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
 import 'package:geoforestcoletor/models/projeto_model.dart';
+import 'package:geoforestcoletor/providers/license_provider.dart';
 
 class FormProjetoPage extends StatefulWidget {
-  // <<< MUDANÇA 1 >>> Adiciona o parâmetro opcional para edição
   final Projeto? projetoParaEditar;
 
   const FormProjetoPage({
@@ -13,7 +16,6 @@ class FormProjetoPage extends StatefulWidget {
     this.projetoParaEditar,
   });
 
-  // <<< MUDANÇA 2 >>> Adiciona um getter para facilitar a verificação do modo de edição
   bool get isEditing => projetoParaEditar != null;
 
   @override
@@ -31,7 +33,6 @@ class _FormProjetoPageState extends State<FormProjetoPage> {
   @override
   void initState() {
     super.initState();
-    // <<< MUDANÇA 3 >>> Lógica para pré-preencher o formulário no modo de edição
     if (widget.isEditing) {
       final projeto = widget.projetoParaEditar!;
       _nomeController.text = projeto.nome;
@@ -47,35 +48,40 @@ class _FormProjetoPageState extends State<FormProjetoPage> {
     _responsavelController.dispose();
     super.dispose();
   }
-
-  // <<< MUDANÇA 4 >>> Função de salvar agora lida com criação e edição
+  
+  // ESTA FUNÇÃO FOI COMPLETAMENTE CORRIGIDA
   Future<void> _salvarProjeto() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSaving = true);
       
-      // Constrói o objeto Projeto. Se estiver editando, mantém o ID e a data de criação originais.
-      final projeto = Projeto(
-        id: widget.isEditing ? widget.projetoParaEditar!.id : null,
-        nome: _nomeController.text.trim(),
-        empresa: _empresaController.text.trim(),
-        responsavel: _responsavelController.text.trim(),
-        dataCriacao: widget.isEditing ? widget.projetoParaEditar!.dataCriacao : DateTime.now(),
-      );
-
       try {
+        // Pega o ID da licença do usuário logado
+        final licenseProvider = context.read<LicenseProvider>();
+        if (licenseProvider.licenseData == null) {
+          throw Exception("Não foi possível identificar a licença do usuário.");
+        }
+        final licenseId = licenseProvider.licenseData!.id;
+
+        // Constrói o objeto Projeto com base no modo (criação ou edição)
+        final projeto = Projeto(
+          id: widget.isEditing ? widget.projetoParaEditar!.id : null,
+          
+          // A "etiqueta" licenseId é adicionada aqui
+          licenseId: widget.isEditing ? widget.projetoParaEditar!.licenseId : licenseId,
+          
+          nome: _nomeController.text.trim(),
+          empresa: _empresaController.text.trim(),
+          responsavel: _responsavelController.text.trim(),
+          dataCriacao: widget.isEditing ? widget.projetoParaEditar!.dataCriacao : DateTime.now(),
+          status: widget.isEditing ? widget.projetoParaEditar!.status : 'ativo',
+        );
+
         final dbHelper = DatabaseHelper.instance;
-        final db = await dbHelper.database; // Obtém a instância do banco
+        final db = await dbHelper.database;
         
         if (widget.isEditing) {
-          // Se estiver editando, executa um UPDATE
-          await db.update(
-            'projetos',
-            projeto.toMap(),
-            where: 'id = ?',
-            whereArgs: [projeto.id],
-          );
+          await db.update('projetos', projeto.toMap(), where: 'id = ?', whereArgs: [projeto.id]);
         } else {
-          // Se não, executa um INSERT
           await db.insert('projetos', projeto.toMap());
         }
 
@@ -86,7 +92,7 @@ class _FormProjetoPageState extends State<FormProjetoPage> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.of(context).pop(true); // Retorna 'true' para recarregar a lista
+          Navigator.of(context).pop(true);
         }
       } catch (e) {
         if (mounted) {
@@ -105,7 +111,6 @@ class _FormProjetoPageState extends State<FormProjetoPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // <<< MUDANÇA 5 >>> O título da página e o texto do botão agora são dinâmicos
       appBar: AppBar(
         title: Text(widget.isEditing ? 'Editar Projeto' : 'Novo Projeto'),
       ),

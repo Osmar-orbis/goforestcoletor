@@ -6,7 +6,7 @@ class Talhao {
   // Chaves estrangeiras
   final String fazendaId; 
   final int fazendaAtividadeId;
-  
+  final int? projetoId;
   // Propriedades do Talhão
   final String nome;
   final double? areaHa;
@@ -24,6 +24,7 @@ class Talhao {
     this.id,
     required this.fazendaId,
     required this.fazendaAtividadeId,
+    this.projetoId,
     required this.nome,
     this.areaHa,
     this.idadeAnos,
@@ -37,6 +38,7 @@ class Talhao {
     int? id,
     String? fazendaId,
     int? fazendaAtividadeId,
+    int? projetoId,
     String? nome,
     double? areaHa,
     double? idadeAnos,

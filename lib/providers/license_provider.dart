@@ -8,6 +8,7 @@ import 'package:geoforestcoletor/services/licensing_service.dart';
 
 // Modelo para guardar os dados da licença
 class LicenseData {
+  final String id;
   final String status;
   final DateTime? trialEndDate;
   final Map<String, dynamic> features;
@@ -16,6 +17,7 @@ class LicenseData {
   final String cargo;
 
   LicenseData({
+    required this.id,
     required this.status,
     this.trialEndDate,
     required this.features,
@@ -90,6 +92,7 @@ class LicenseProvider with ChangeNotifier {
         final cargoDoUsuario = usuariosPermitidos[user.uid] as String? ?? 'equipe'; // Padrão 'equipe' por segurança
 
         _licenseData = LicenseData(
+          id: doc.id,
           status: data['statusAssinatura'] ?? 'inativa',
           trialEndDate: (trialData?['dataFim'] as Timestamp?)?.toDate(),
           features: data['features'] ?? {},

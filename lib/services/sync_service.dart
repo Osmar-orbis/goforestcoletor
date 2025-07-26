@@ -100,12 +100,23 @@ class SyncService {
     // 1. Baixar e salvar Projetos
     final projetosSnap = await _firestore.collection('clientes').doc(licenseId).collection('projetos').get();
     for (var doc in projetosSnap.docs) {
-      if (doc.data()['status'] != 'arquivado') {
-        await db.insert('projetos', doc.data(), conflictAlgorithm: ConflictAlgorithm.replace);
+      
+      // <<< INÍCIO DA MUDANÇA >>>
+      final data = doc.data();
+      // Adicionamos a "etiqueta" licenseId aos dados antes de salvar
+      data['licenseId'] = licenseId; 
+      // <<< FIM DA MUDANÇA >>>
+
+      if (data['status'] != 'arquivado') {
+        // Agora salvamos os dados já com a etiqueta
+        await db.insert('projetos', data, conflictAlgorithm: ConflictAlgorithm.replace);
       } else {
-        await db.delete('projetos', where: 'id = ?', whereArgs: [doc.data()['id']]);
+        await db.delete('projetos', where: 'id = ?', whereArgs: [data['id']]);
       }
     }
+    
+    // O download das outras tabelas (atividades, fazendas, talhões) não precisa mudar,
+    // pois elas estão ligadas a um projeto, que agora terá o licenseId.
     
     // 2. Baixar e salvar Atividades
     final atividadesSnap = await _firestore.collection('clientes').doc(licenseId).collection('atividades').get();
@@ -125,7 +136,7 @@ class SyncService {
       await db.insert('talhoes', doc.data(), conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
-    debugPrint("Hierarquia completa baixada e sincronizada localmente.");
+    debugPrint("Hierarquia completa baixada e ETIQUETADA localmente.");
   }
 
   /// Baixa as coletas (parcelas e cubagens) que não existem localmente.

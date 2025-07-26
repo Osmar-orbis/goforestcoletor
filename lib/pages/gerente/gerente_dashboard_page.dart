@@ -163,45 +163,32 @@ class GerenteDashboardPage extends StatelessWidget {
   }
 
   Widget _buildRadarChartCard(BuildContext context, Map<String, int> data) {
-    final entries = data.entries.toList();
-    final dataSets = [
-      RadarDataSet(
-        fillColor: Colors.teal.withOpacity(0.4),
-        borderColor: Colors.teal,
-        borderWidth: 2,
-        entryRadius: 3,
-        dataEntries: entries.map((e) => RadarEntry(value: e.value.toDouble())).toList(),
-      ),
-    ];
-
+  
+  // =======================================================
+  // ================ INÍCIO DA CORREÇÃO ===================
+  // =======================================================
+  
+  // VERIFICAÇÃO DE SEGURANÇA:
+  // Se o mapa de dados tiver menos de 3 entradas,
+  // não tentamos construir o gráfico e mostramos um aviso.
+  if (data.length < 3) {
     return Card(
       elevation: 2,
-      child: Padding(
+      child: Container(
         padding: const EdgeInsets.all(16.0),
+        height: 350, // Altura similar à do seu card original
+        alignment: Alignment.center,
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text("Desempenho por Equipe", style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 250,
-              child: RadarChart(
-                RadarChartData(
-                  dataSets: dataSets,
-                  radarBackgroundColor: Colors.transparent,
-                  borderData: FlBorderData(show: false),
-                  radarBorderData: const BorderSide(color: Colors.grey, width: 1),
-                  getTitle: (index, angle) {
-                    if (index >= entries.length) return const RadarChartTitle(text: '');
-                    return RadarChartTitle(text: entries[index].key);
-                  },
-                  titleTextStyle: const TextStyle(color: Colors.black, fontSize: 12),
-                  tickCount: 5,
-                  ticksTextStyle: const TextStyle(color: Colors.grey, fontSize: 10),
-                  tickBorderData: const BorderSide(color: Colors.grey, width: 1),
-                  gridBorderData: const BorderSide(color: Colors.grey, width: 1),
-                  radarShape: RadarShape.polygon,
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'Dados insuficientes para gerar o gráfico.\n(São necessárias no mínimo 3 equipes com dados)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
                 ),
-                swapAnimationDuration: const Duration(milliseconds: 400),
               ),
             ),
           ],
@@ -210,6 +197,59 @@ class GerenteDashboardPage extends StatelessWidget {
     );
   }
 
+  // =======================================================
+  // ================= FIM DA CORREÇÃO =====================
+  // =======================================================
+
+  // Se a verificação passar, o resto do seu código original é executado
+  // sem nenhuma alteração.
+
+  final entries = data.entries.toList();
+  final dataSets = [
+    RadarDataSet(
+      fillColor: Colors.teal.withOpacity(0.4),
+      borderColor: Colors.teal,
+      borderWidth: 2,
+      entryRadius: 3,
+      dataEntries: entries.map((e) => RadarEntry(value: e.value.toDouble())).toList(),
+    ),
+  ];
+
+  return Card(
+    elevation: 2,
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          Text("Desempenho por Equipe", style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 250,
+            child: RadarChart(
+              RadarChartData(
+                dataSets: dataSets,
+                radarBackgroundColor: Colors.transparent,
+                borderData: FlBorderData(show: false),
+                radarBorderData: const BorderSide(color: Colors.grey, width: 1),
+                getTitle: (index, angle) {
+                  if (index >= entries.length) return const RadarChartTitle(text: '');
+                  return RadarChartTitle(text: entries[index].key);
+                },
+                titleTextStyle: const TextStyle(color: Colors.black, fontSize: 12),
+                tickCount: 5,
+                ticksTextStyle: const TextStyle(color: Colors.grey, fontSize: 10),
+                tickBorderData: const BorderSide(color: Colors.grey, width: 1),
+                gridBorderData: const BorderSide(color: Colors.grey, width: 1),
+                radarShape: RadarShape.polygon,
+              ),
+              swapAnimationDuration: const Duration(milliseconds: 400),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
   Widget _buildBarChartWithTrendLineCard(BuildContext context, Map<String, int> data) {
     final entries = data.entries.toList();
     final barGroups = entries.asMap().entries.map((entry) {

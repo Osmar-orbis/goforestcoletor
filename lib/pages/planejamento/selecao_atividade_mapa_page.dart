@@ -1,12 +1,15 @@
-// lib/pages/planejamento/selecao_atividade_mapa_page.dart (VERSÃO COMPLETA E CORRIGIDA)
+// lib/pages/planejamento/selecao_atividade_mapa_page.dart (VERSÃO AJUSTADA E COMPLETA)
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+// Imports do projeto (verifique se todos estão corretos)
 import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
 import 'package:geoforestcoletor/models/atividade_model.dart';
 import 'package:geoforestcoletor/models/projeto_model.dart';
 import 'package:geoforestcoletor/pages/menu/map_import_page.dart';
+import 'package:geoforestcoletor/providers/license_provider.dart';
 import 'package:geoforestcoletor/providers/map_provider.dart';
-import 'package:provider/provider.dart';
 
 class SelecaoAtividadeMapaPage extends StatefulWidget {
   const SelecaoAtividadeMapaPage({super.key});
@@ -17,15 +20,52 @@ class SelecaoAtividadeMapaPage extends StatefulWidget {
 
 class _SelecaoAtividadeMapaPageState extends State<SelecaoAtividadeMapaPage> {
   final dbHelper = DatabaseHelper.instance;
-  late Future<List<Projeto>> _projetosFuture;
+  // A variável não é mais 'late' pois será inicializada após o build inicial
+  Future<List<Projeto>>? _projetosFuture; 
   final Map<int, List<Atividade>> _atividadesPorProjeto = {};
   bool _isLoadingAtividades = false;
 
   @override
   void initState() {
     super.initState();
-    _projetosFuture = dbHelper.getTodosProjetos();
+    // Chamamos a função para carregar os projetos de forma segura,
+    // garantindo que o 'context' do Provider esteja disponível.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _carregarProjetos();
+    });
   }
+
+  // Esta nova função é responsável por buscar os projetos de forma segura
+  Future<void> _carregarProjetos() async {
+    // Usamos o Provider para descobrir qual licença está ativa
+    final licenseProvider = context.read<LicenseProvider>();
+    
+    // Verificação de segurança: se não houver dados da licença, não fazemos nada
+    if (licenseProvider.licenseData == null) {
+      // Você pode mostrar uma mensagem de erro aqui se desejar
+      if (mounted) {
+        setState(() {
+          _projetosFuture = Future.value([]); // Retorna uma lista vazia
+        });
+      }
+      return;
+    }
+
+    // Pegamos o ID da licença do usuário logado
+    // (Isso depende do ajuste no LicenseProvider que discutimos)
+    final licenseId = licenseProvider.licenseData!.id; 
+
+    // Atualizamos o estado da tela com a chamada correta ao banco de dados
+    if (mounted) {
+      setState(() {
+        // Chamamos a nova função 'getProjetos' passando o filtro 'licenseId'
+        _projetosFuture = dbHelper.getTodosProjetos(licenseId);
+      });
+    }
+  }
+
+  // NENHUMA MUDANÇA NECESSÁRIA A PARTIR DAQUI.
+  // As funções abaixo já estavam corretas e continuam funcionando.
 
   Future<void> _carregarAtividadesDoProjeto(int projetoId) async {
     if (_atividadesPorProjeto.containsKey(projetoId)) return;
@@ -50,7 +90,7 @@ class _SelecaoAtividadeMapaPageState extends State<SelecaoAtividadeMapaPage> {
     // 3. Carrega as amostras existentes para essa atividade, se houver.
     mapProvider.loadSamplesParaAtividade();
 
-    // 4. Navega para a página do mapa (que agora não precisa de parâmetros).
+    // 4. Navega para a página do mapa.
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -66,17 +106,17 @@ class _SelecaoAtividadeMapaPageState extends State<SelecaoAtividadeMapaPage> {
         title: const Text('Selecionar Atividade'),
       ),
       body: FutureBuilder<List<Projeto>>(
-        future: _projetosFuture,
+        future: _projetosFuture, // Agora usa a variável de estado correta
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting && _projetosFuture == null) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
             return Center(child: Text('Erro: ${snapshot.error}'));
           }
           final projetos = snapshot.data ?? [];
-          if (projetos.isEmpty) {
-            return const Center(child: Text('Nenhum projeto encontrado.'));
+          if (projetos.isEmpty && snapshot.connectionState == ConnectionState.done) {
+            return const Center(child: Text('Nenhum projeto encontrado para esta licença.'));
           }
 
           return ListView.builder(

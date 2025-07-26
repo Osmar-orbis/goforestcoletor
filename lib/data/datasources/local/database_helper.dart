@@ -59,7 +59,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       join(await getDatabasesPath(), 'geoforestcoletor.db'),
-      version: 28,
+      version: 29,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -72,6 +72,7 @@ class DatabaseHelper {
      await db.execute('''
       CREATE TABLE projetos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        licenseId TEXT NOT NULL,
         nome TEXT NOT NULL,
         empresa TEXT NOT NULL,
         responsavel TEXT NOT NULL,
@@ -221,14 +222,21 @@ class DatabaseHelper {
           await db.execute("ALTER TABLE parcelas ADD COLUMN nomeLider TEXT");
           await db.execute("ALTER TABLE parcelas ADD COLUMN projetoId INTEGER");
           break;
+        case 29:
+          (await db.execute("ALTER TABLE projetos ADD COLUMN licenseId TEXT"));
+          break;
       }
     }
   }
 
   Future<int> insertProjeto(Projeto p) async => await (await database).insert('projetos', p.toMap());
-  Future<List<Projeto>> getTodosProjetos() async {
+  Future<List<Projeto>> getTodosProjetos(String licenseId) async {
     final db = await database;
-    final maps = await db.query('projetos', where: 'status = ?', whereArgs: ['ativo'], orderBy: 'dataCriacao DESC');
+    final maps = await db.query(
+   'projetos',
+    where: 'status = ? AND licenseId = ?',
+    whereArgs: ['ativo', licenseId],
+    orderBy: 'dataCriacao DESC');
     return List.generate(maps.length, (i) => Projeto.fromMap(maps[i]));
   }
   Future<List<Projeto>> getTodosOsProjetosParaGerente() async {
