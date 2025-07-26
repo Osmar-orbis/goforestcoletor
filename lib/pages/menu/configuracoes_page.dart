@@ -1,4 +1,4 @@
-// lib/pages/menu/configuracoes_page.dart (VERSÃO CORRIGIDA E ATUALIZADA)
+// lib/pages/menu/configuracoes_page.dart (VERSÃO COM NAVEGAÇÃO DE LOGOUT CORRIGIDA)
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -27,7 +27,7 @@ class ConfiguracoesPage extends StatefulWidget {
 
 class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
   String? _zonaSelecionada;
-  final dbHelper = DatabaseHelper.instance; // Correção: usar a instância singleton
+  final dbHelper = DatabaseHelper.instance;
   
   final LicensingService _licensingService = LicensingService();
   Map<String, int>? _deviceUsage;
@@ -59,13 +59,8 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
     }
   }
   
-  // =======================================================================
-  // <<< CORREÇÃO PRINCIPAL APLICADA AQUI >>>
-  // =======================================================================
   Future<void> _fetchDeviceUsage() async {
-    // Não precisamos mais do email, o serviço lida com isso internamente.
     try {
-      // A chamada agora é feita sem nenhum argumento.
       final usage = await _licensingService.getDeviceUsage();
       if (mounted) {
         setState(() {
@@ -78,13 +73,12 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
       if(mounted) {
         setState(() {
           _isLoadingLicense = false;
-          _deviceUsage = null; // Garante que não mostre dados antigos em caso de erro
+          _deviceUsage = null;
         });
       }
     }
   }
 
-  // O restante do arquivo não precisa de alterações.
   Future<void> _mostrarDialogoLimpeza({
     required String titulo,
     required String conteudo,
@@ -120,7 +114,11 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
       conteudo: 'Tem certeza de que deseja sair da sua conta?',
       isDestructive: false,
       onConfirmar: () async {
+        // <<< CORREÇÃO APLICADA AQUI >>>
+        // Primeiro, executa a lógica de logout no controller
         await context.read<LoginController>().signOut();
+        
+        // Depois, garante uma navegação limpa para a tela de login, removendo todas as outras telas
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const LoginPage()),

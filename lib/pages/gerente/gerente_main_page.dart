@@ -1,10 +1,9 @@
-// lib/pages/gerente/gerente_main_page.dart (VERSÃO CORRIGIDA)
+// lib/pages/gerente/gerente_main_page.dart (VERSÃO CORRIGIDA SEM BOTÃO DE LOGOUT)
 
 import 'package:flutter/material.dart';
-import 'package:geoforestcoletor/controller/login_controller.dart';
 import 'package:geoforestcoletor/pages/gerente/gerente_dashboard_page.dart';
 import 'package:geoforestcoletor/pages/menu/home_page.dart';
-import 'package:provider/provider.dart';
+
 
 class GerenteMainPage extends StatefulWidget {
   const GerenteMainPage({super.key});
@@ -18,7 +17,6 @@ class _GerenteMainPageState extends State<GerenteMainPage> {
 
   static const List<Widget> _pages = <Widget>[
     GerenteDashboardPage(),
-    // <<< CORREÇÃO AQUI: Diga para a HomePage não mostrar sua própria AppBar >>>
     HomePage(title: 'Modo Coleta de Campo', showAppBar: false),
   ];
 
@@ -38,15 +36,9 @@ class _GerenteMainPageState extends State<GerenteMainPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_pageTitles.elementAt(_selectedIndex)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sair da Conta',
-            onPressed: () {
-              context.read<LoginController>().signOut();
-            },
-          )
-        ],
+        
+        // <<< O BLOCO 'ACTIONS' FOI REMOVIDO DAQUI >>>
+        
         automaticallyImplyLeading: false, 
       ),
       body: IndexedStack(

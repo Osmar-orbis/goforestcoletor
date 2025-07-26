@@ -1,9 +1,9 @@
-// lib/models/parcela_model.dart (VERSÃO ATUALIZADA COM UUID)
+// lib/models/parcela_model.dart (VERSÃO CORRIGIDA E COMPLETA)
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/models/arvore_model.dart';
-import 'package:uuid/uuid.dart'; // <<< IMPORT NECESSÁRIO
+import 'package:uuid/uuid.dart';
 
 enum StatusParcela {
   pendente(Icons.pending_outlined, Colors.grey),
@@ -19,13 +19,15 @@ enum StatusParcela {
 
 class Parcela {
   int? dbId;
-  String uuid; // <<< NOVO CAMPO OBRIGATÓRIO
+  String uuid;
   int? talhaoId; 
   DateTime? dataColeta;
   
   final String? idFazenda;
   final String? nomeFazenda;
   final String? nomeTalhao;
+  final String? nomeLider;
+  final int? projetoId;    // <<< CAMPO ADICIONADO PARA CORRIGIR O FILTRO
 
   // Campos principais
   final String idParcela;
@@ -45,7 +47,7 @@ class Parcela {
 
   Parcela({
     this.dbId,
-    String? uuid, // Parâmetro opcional
+    String? uuid,
     required this.talhaoId,
     required this.idParcela,
     required this.areaMetrosQuadrados,
@@ -62,13 +64,15 @@ class Parcela {
     this.largura,
     this.comprimento,
     this.raio,
+    this.nomeLider,
+    this.projetoId, // <<< ADICIONADO AO CONSTRUTOR
     this.photoPaths = const [],
     this.arvores = const [],
-  }) : uuid = uuid ?? const Uuid().v4(); // <<< GERA UUID AUTOMATICAMENTE
+  }) : uuid = uuid ?? const Uuid().v4();
 
   Parcela copyWith({
     int? dbId,
-    String? uuid, // <<< ADICIONADO
+    String? uuid,
     int? talhaoId,
     String? idFazenda,
     String? nomeFazenda,
@@ -85,12 +89,14 @@ class Parcela {
     double? largura,
     double? comprimento,
     double? raio,
+    String? nomeLider,
+    int? projetoId, // <<< ADICIONADO AO COPYWITH
     List<String>? photoPaths,
     List<Arvore>? arvores,
   }) {
     return Parcela(
       dbId: dbId ?? this.dbId,
-      uuid: uuid ?? this.uuid, // <<< ADICIONADO
+      uuid: uuid ?? this.uuid,
       talhaoId: talhaoId ?? this.talhaoId,
       idFazenda: idFazenda ?? this.idFazenda,
       nomeFazenda: nomeFazenda ?? this.nomeFazenda,
@@ -107,6 +113,8 @@ class Parcela {
       largura: largura ?? this.largura,
       comprimento: comprimento ?? this.comprimento,
       raio: raio ?? this.raio,
+      nomeLider: nomeLider ?? this.nomeLider,
+      projetoId: projetoId ?? this.projetoId, // <<< ADICIONADO AO COPYWITH
       photoPaths: photoPaths ?? this.photoPaths,
       arvores: arvores ?? this.arvores,
     );
@@ -115,7 +123,7 @@ class Parcela {
   Map<String, dynamic> toMap() {
     return {
       'id': dbId,
-      'uuid': uuid, // <<< ADICIONADO
+      'uuid': uuid,
       'talhaoId': talhaoId,
       'idFazenda': idFazenda,
       'nomeFazenda': nomeFazenda,
@@ -132,6 +140,8 @@ class Parcela {
       'largura': largura,
       'comprimento': comprimento,
       'raio': raio,
+      'nomeLider': nomeLider,
+      'projetoId': projetoId, // <<< ADICIONADO AO MAP
       'photoPaths': jsonEncode(photoPaths),
     };
   }
@@ -148,7 +158,7 @@ class Parcela {
 
     return Parcela(
       dbId: map['id'],
-      uuid: map['uuid'], // <<< ADICIONADO (DEVE EXISTIR AO VIR DO BD/FIRESTORE)
+      uuid: map['uuid'],
       talhaoId: map['talhaoId'],
       idFazenda: map['idFazenda'],
       nomeFazenda: map['nomeFazenda'],
@@ -168,6 +178,8 @@ class Parcela {
       largura: map['largura'],
       comprimento: map['comprimento'],
       raio: map['raio'],
+      nomeLider: map['nomeLider'],
+      projetoId: map['projetoId'], // <<< LÊ O ID DO PROJETO DO MAPA
       photoPaths: paths,
     );
   }

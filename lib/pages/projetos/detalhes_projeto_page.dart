@@ -1,4 +1,4 @@
-// lib/pages/projetos/detalhes_projeto_page.dart
+// lib/pages/projetos/detalhes_projeto_page.dart (VERSÃO COM NAVEGAÇÃO CORRIGIDA)
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -7,7 +7,6 @@ import 'package:geoforestcoletor/models/projeto_model.dart';
 import 'package:geoforestcoletor/models/atividade_model.dart';
 import 'package:geoforestcoletor/pages/atividades/form_atividade_page.dart';
 import 'package:geoforestcoletor/pages/atividades/detalhes_atividade_page.dart';
-import 'package:geoforestcoletor/pages/menu/home_page.dart'; // <<< 1. IMPORTA A HOMEPAGE
 
 class DetalhesProjetoPage extends StatefulWidget {
   final Projeto projeto;
@@ -21,7 +20,6 @@ class _DetalhesProjetoPageState extends State<DetalhesProjetoPage> {
   late Future<List<Atividade>> _atividadesFuture;
   final dbHelper = DatabaseHelper.instance;
 
-  // >>> 2. ESTADO PARA CONTROLAR O MODO DE SELEÇÃO <<<
   bool _isSelectionMode = false;
   final Set<int> _selectedAtividades = {};
 
@@ -141,10 +139,9 @@ class _DetalhesProjetoPageState extends State<DetalhesProjetoPage> {
         IconButton(
           icon: const Icon(Icons.home_outlined),
           tooltip: 'Voltar para o Início',
-          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomePage(title: 'Geo Forest Analytics')),
-            (Route<dynamic> route) => false,
-          ),
+          // <<< CORREÇÃO DA NAVEGAÇÃO >>>
+          // Em vez de recriar a HomePage, ele "desempilha" as telas até chegar na primeira.
+          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
         ),
       ],
     );

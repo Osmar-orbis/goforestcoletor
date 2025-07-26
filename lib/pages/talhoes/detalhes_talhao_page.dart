@@ -1,4 +1,4 @@
-// lib/pages/talhoes/detalhes_talhao_page.dart (VERSÃO COM O BOTÃO SIMPLIFICADO)
+// lib/pages/talhoes/detalhes_talhao_page.dart (VERSÃO COM NAVEGAÇÃO CORRIGIDA)
 
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/models/cubagem_arvore_model.dart';
@@ -7,13 +7,9 @@ import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
 import 'package:geoforestcoletor/models/atividade_model.dart';
 import 'package:geoforestcoletor/models/talhao_model.dart';
 import 'package:geoforestcoletor/models/parcela_model.dart';
-import 'package:geoforestcoletor/pages/menu/home_page.dart';
 import 'package:geoforestcoletor/pages/dashboard/talhao_dashboard_page.dart';
 import 'package:geoforestcoletor/pages/amostra/coleta_dados_page.dart';
 import 'package:geoforestcoletor/pages/cubagem/cubagem_dados_page.dart';
-// Import do SpeedDial não é mais necessário aqui
-// import 'package:flutter_speed_dial/flutter_speed_dial.dart';
-
 
 class DetalhesTalhaoPage extends StatefulWidget {
   final Talhao talhao;
@@ -27,8 +23,6 @@ class DetalhesTalhaoPage extends StatefulWidget {
 }
 
 class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
-  // Todo o corpo da classe State permanece exatamente o mesmo,
-  // exceto pela função `build` no final.
   late Future<List<dynamic>> _dataFuture;
   final dbHelper = DatabaseHelper.instance;
 
@@ -228,10 +222,8 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
         IconButton(
           icon: const Icon(Icons.home_outlined),
           tooltip: 'Voltar para o Início',
-          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomePage(title: 'Geo Forest Analytics')),
-            (Route<dynamic> route) => false,
-          ),
+          // <<< CORREÇÃO DA NAVEGAÇÃO >>>
+          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
         ),
       ],
     );
@@ -249,10 +241,7 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
         return 'Exportada';
     }
   }
-
-  // =======================================================================
-  // <<< INÍCIO DA MUDANÇA >>>
-  // =======================================================================
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -324,7 +313,6 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
           ),
         ],
       ),
-      // REVERSÃO DO BOTÃO: Voltamos ao FloatingActionButton simples, pois o de desenho foi para o mapa.
       floatingActionButton: _isSelectionMode
           ? null
           : FloatingActionButton.extended(
@@ -335,9 +323,6 @@ class _DetalhesTalhaoPageState extends State<DetalhesTalhaoPage> {
             ),
     );
   }
-  // =======================================================================
-  // <<< FIM DA MUDANÇA >>>
-  // =======================================================================
 
   Widget _buildListaDeParcelas(List<Parcela> parcelas) {
     return ListView.builder(

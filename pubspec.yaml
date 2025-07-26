@@ -60,6 +60,7 @@ dependencies:
   # Fotos
   image_picker: ^1.0.7
   simple_animations: ^5.2.0
+  image: ^4.5.4
 
   # Vitrines
   # flutter_stripe: ^10.1.1 # Verifique a versão mais recente no pub.dev

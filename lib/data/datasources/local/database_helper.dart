@@ -1,4 +1,4 @@
-// lib/data/datasources/local/database_helper.dart (VERSÃO CORRIGIDA E COMPLETA)
+// lib/data/datasources/local/database_helper.dart (VERSÃO 100% COMPLETA E CORRIGIDA)
 
 import 'dart:convert';
 import 'package:csv/csv.dart';
@@ -59,7 +59,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       join(await getDatabasesPath(), 'geoforestcoletor.db'),
-      version: 27, // <<< CORREÇÃO 1: Versão atualizada para 27
+      version: 28,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -76,10 +76,9 @@ class DatabaseHelper {
         empresa TEXT NOT NULL,
         responsavel TEXT NOT NULL,
         dataCriacao TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'ativo' -- <<< CORREÇÃO 2: Coluna status adicionada
+        status TEXT NOT NULL DEFAULT 'ativo'
       )
     ''');
-    // ... O resto do seu método _onCreate continua aqui...
     await db.execute('''
       CREATE TABLE atividades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,6 +135,8 @@ class DatabaseHelper {
         comprimento REAL,
         raio REAL,
         photoPaths TEXT,
+        nomeLider TEXT,
+        projetoId INTEGER,
         FOREIGN KEY (talhaoId) REFERENCES talhoes (id) ON DELETE CASCADE
       )
     ''');
@@ -186,7 +187,6 @@ class DatabaseHelper {
         FOREIGN KEY (cubagemArvoreId) REFERENCES cubagens_arvores (id) ON DELETE CASCADE
       )
     ''');
-    
     await db.execute('''
       CREATE TABLE sortimentos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,7 +196,6 @@ class DatabaseHelper {
         diametroMaximo REAL NOT NULL
       )
     ''');
-
     await db.execute('CREATE INDEX idx_arvores_parcelaId ON arvores(parcelaId)');
     await db.execute('CREATE INDEX idx_cubagens_secoes_cubagemArvoreId ON cubagens_secoes(cubagemArvoreId)');
   }
@@ -209,42 +208,34 @@ class DatabaseHelper {
           await db.execute('ALTER TABLE parcelas ADD COLUMN uuid TEXT');
           final parcelasSemUuid = await db.query('parcelas', where: 'uuid IS NULL');
           for (final p in parcelasSemUuid) {
-            await db.update(
-              'parcelas', 
-              {'uuid': const Uuid().v4()},
-              where: 'id = ?',
-              whereArgs: [p['id']]
-            );
+            await db.update('parcelas', {'uuid': const Uuid().v4()}, where: 'id = ?', whereArgs: [p['id']]);
           }
           break;
         case 26:
           await db.execute('ALTER TABLE cubagens_arvores ADD COLUMN isSynced INTEGER DEFAULT 0 NOT NULL');
           break;
-        case 27: // <<< CORREÇÃO 3: Adicionado o case para a versão 27
+        case 27:
           await db.execute("ALTER TABLE projetos ADD COLUMN status TEXT NOT NULL DEFAULT 'ativo'");
+          break;
+        case 28:
+          await db.execute("ALTER TABLE parcelas ADD COLUMN nomeLider TEXT");
+          await db.execute("ALTER TABLE parcelas ADD COLUMN projetoId INTEGER");
           break;
       }
     }
   }
 
-  // --- MÉTODOS CRUD: HIERARQUIA ---
   Future<int> insertProjeto(Projeto p) async => await (await database).insert('projetos', p.toMap());
-
-  // <<< CORREÇÃO 4: Função modificada para filtrar por status ativo >>>
   Future<List<Projeto>> getTodosProjetos() async {
     final db = await database;
-    // Filtra para pegar apenas projetos com status 'ativo'
     final maps = await db.query('projetos', where: 'status = ?', whereArgs: ['ativo'], orderBy: 'dataCriacao DESC');
     return List.generate(maps.length, (i) => Projeto.fromMap(maps[i]));
   }
-
   Future<List<Projeto>> getTodosOsProjetosParaGerente() async {
-  final db = await database;
-  // A mesma consulta, mas sem o filtro de status
-  final maps = await db.query('projetos', orderBy: 'dataCriacao DESC');
-  return List.generate(maps.length, (i) => Projeto.fromMap(maps[i]));
-}
-  
+    final db = await database;
+    final maps = await db.query('projetos', orderBy: 'dataCriacao DESC');
+    return List.generate(maps.length, (i) => Projeto.fromMap(maps[i]));
+  }
   Future<Projeto?> getProjetoById(int id) async {
     final db = await database;
     final maps = await db.query('projetos', where: 'id = ?', whereArgs: [id]);
@@ -252,8 +243,6 @@ class DatabaseHelper {
     return null;
   }
   Future<void> deleteProjeto(int id) async => await (await database).delete('projetos', where: 'id = ?', whereArgs: [id]);
-  
-  // ... O restante do seu arquivo continua inalterado ...
   Future<int> insertAtividade(Atividade a) async => await (await database).insert('atividades', a.toMap());
   Future<List<Atividade>> getAtividadesDoProjeto(int projetoId) async {
     final maps = await (await database).query('atividades', where: 'projetoId = ?', whereArgs: [projetoId], orderBy: 'dataCriacao DESC');
@@ -308,8 +297,7 @@ class DatabaseHelper {
     }
     return null;
   }
-  Future<void> criarAtividadeComPlanoDeCubagem(
-      Atividade novaAtividade, List<CubagemArvore> placeholders) async {
+  Future<void> criarAtividadeComPlanoDeCubagem(Atividade novaAtividade, List<CubagemArvore> placeholders) async {
     if (placeholders.isEmpty) {
       throw Exception("A lista de árvores para cubagem (placeholders) não pode estar vazia.");
     }
@@ -317,20 +305,9 @@ class DatabaseHelper {
     await db.transaction((txn) async {
       final atividadeId = await txn.insert('atividades', novaAtividade.toMap());
       final firstPlaceholder = placeholders.first;
-      final fazendaDoPlano = Fazenda(
-        id: firstPlaceholder.idFazenda!,
-        atividadeId: atividadeId,
-        nome: firstPlaceholder.nomeFazenda,
-        municipio: 'N/I',
-        estado: 'N/I',
-      );
-      await txn.insert('fazendas', fazendaDoPlano.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace);
-      final talhaoDoPlano = Talhao(
-        fazendaId: fazendaDoPlano.id,
-        fazendaAtividadeId: fazendaDoPlano.atividadeId,
-        nome: firstPlaceholder.nomeTalhao,
-      );
+      final fazendaDoPlano = Fazenda(id: firstPlaceholder.idFazenda!, atividadeId: atividadeId, nome: firstPlaceholder.nomeFazenda, municipio: 'N/I', estado: 'N/I');
+      await txn.insert('fazendas', fazendaDoPlano.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      final talhaoDoPlano = Talhao(fazendaId: fazendaDoPlano.id, fazendaAtividadeId: fazendaDoPlano.atividadeId, nome: firstPlaceholder.nomeTalhao);
       final talhaoId = await txn.insert('talhoes', talhaoDoPlano.toMap());
       for (final placeholder in placeholders) {
         final map = placeholder.toMap();
@@ -341,8 +318,6 @@ class DatabaseHelper {
     });
     debugPrint('Atividade de cubagem e ${placeholders.length} placeholders criados com sucesso!');
   }
-
-  // --- MÉTODOS CRUD: COLETA ---
   Future<Parcela> saveParcela(Parcela parcela) async {
     final db = await database;
     final dbId = await db.insert('parcelas', parcela.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
@@ -511,22 +486,12 @@ class DatabaseHelper {
         final classe = entry.key;
         final quantidade = entry.value;
         for (int i = 1; i <= quantidade; i++) {
-          final arvoreCubagem = CubagemArvore(
-            talhaoId: talhao.id!,
-            idFazenda: talhao.fazendaId,
-            nomeFazenda: talhao.fazendaNome ?? 'N/A',
-            nomeTalhao: talhao.nome,
-            identificador: '${talhao.nome} - Árvore ${i.toString().padLeft(2, '0')}',
-            classe: classe,
-            isSynced: false,
-          );
+          final arvoreCubagem = CubagemArvore(talhaoId: talhao.id!, idFazenda: talhao.fazendaId, nomeFazenda: talhao.fazendaNome ?? 'N/A', nomeTalhao: talhao.nome, identificador: '${talhao.nome} - Árvore ${i.toString().padLeft(2, '0')}', classe: classe, isSynced: false);
           await txn.insert('cubagens_arvores', arvoreCubagem.toMap());
         }
       }
     });
   }
-
-  // --- MÉTODOS DE ANÁLISE E ESTATÍSTICAS ---
   Future<Map<String, double>> getDistribuicaoPorCodigo(int parcelaId) async {
     final db = await database;
     final result = await db.rawQuery('SELECT codigo, COUNT(*) as total FROM arvores WHERE parcelaId = ? GROUP BY codigo', [parcelaId]);
@@ -566,13 +531,16 @@ class DatabaseHelper {
     ''', ids);
     return List.generate(talhoesMaps.length, (i) => Talhao.fromMap(talhoesMaps[i]));
   }
-
-  // --- MÉTODOS DE EXPORTAÇÃO E IMPORTAÇÃO ---
+  
   Future<List<Parcela>> getUnexportedConcludedParcelas() async {
     final db = await database;
-    final maps = await db.query('parcelas', where: 'status = ? AND exportada = ?', whereArgs: [StatusParcela.concluida.name, 0]);
+    final maps = await db.query('parcelas', 
+        where: 'status = ? AND exportada = ? AND isSynced = ?', 
+        whereArgs: [StatusParcela.concluida.name, 0, 0]
+    );
     return List.generate(maps.length, (i) => Parcela.fromMap(maps[i]));
   }
+  
   Future<List<Parcela>> getTodasAsParcelasConcluidasParaBackup() async {
     final db = await database;
     final maps = await db.query('parcelas', where: 'status = ?', whereArgs: [StatusParcela.concluida.name]);
@@ -581,12 +549,7 @@ class DatabaseHelper {
   Future<void> marcarParcelasComoExportadas(List<int> ids) async {
     if (ids.isEmpty) return;
     final db = await database;
-    await db.update(
-      'parcelas',
-      {'exportada': 1},
-      where: 'id IN (${List.filled(ids.length, '?').join(',')})',
-      whereArgs: ids,
-    );
+    await db.update('parcelas', {'exportada': 1}, where: 'id IN (${List.filled(ids.length, '?').join(',')})', whereArgs: ids);
   }
   Future<String> importarProjetoCompleto(String fileContent) async {
     final db = await database;
@@ -623,15 +586,7 @@ class DatabaseHelper {
           }
           Talhao? talhao = await txn.query('talhoes', where: 'nome = ? AND fazendaId = ? AND fazendaAtividadeId = ?', whereArgs: [properties['talhao_nome'], fazenda.id, fazenda.atividadeId]).then((list) => list.isEmpty ? null : Talhao.fromMap(list.first));
           if (talhao == null) {
-            talhao = Talhao(
-              fazendaId: fazenda.id, 
-              fazendaAtividadeId: fazenda.atividadeId, 
-              nome: properties['talhao_nome'], 
-              especie: properties['especie'], 
-              areaHa: properties['area_ha'], 
-              idadeAnos: properties['idade_anos'],
-              espacamento: properties['espacam'],
-            );
+            talhao = Talhao(fazendaId: fazenda.id, fazendaAtividadeId: fazenda.atividadeId, nome: properties['talhao_nome'], especie: properties['especie'], areaHa: properties['area_ha'], idadeAnos: properties['idade_anos'], espacamento: properties['espacam']);
             final talhaoId = await txn.insert('talhoes', talhao.toMap());
             talhao = talhao.copyWith(id: talhaoId);
             talhoesCriados++;
@@ -639,17 +594,7 @@ class DatabaseHelper {
           Parcela? parcela = await txn.query('parcelas', where: 'idParcela = ? AND talhaoId = ?', whereArgs: [properties['parcela_id_plano'], talhao.id]).then((list) => list.isEmpty ? null : Parcela.fromMap(list.first));
           if (parcela == null) {
             final geometry = feature['geometry'];
-            parcela = Parcela(
-              talhaoId: talhao.id!,
-              idParcela: properties['parcela_id_plano'],
-              areaMetrosQuadrados: properties['area_m2'] ?? 0.0,
-              status: StatusParcela.pendente,
-              dataColeta: DateTime.now(),
-              latitude: geometry != null ? geometry['coordinates'][0][0][1] : null,
-              longitude: geometry != null ? geometry['coordinates'][0][0][0] : null,
-              nomeFazenda: fazenda.nome,
-              nomeTalhao: talhao.nome,
-            );
+            parcela = Parcela(talhaoId: talhao.id!, idParcela: properties['parcela_id_plano'], areaMetrosQuadrados: properties['area_m2'] ?? 0.0, status: StatusParcela.pendente, dataColeta: DateTime.now(), latitude: geometry != null ? geometry['coordinates'][0][0][1] : null, longitude: geometry != null ? geometry['coordinates'][0][0][0] : null, nomeFazenda: fazenda.nome, nomeTalhao: talhao.nome);
             await txn.insert('parcelas', parcela.toMap());
             parcelasCriadas++;
           }
@@ -664,12 +609,7 @@ class DatabaseHelper {
   Future<void> marcarCubagensComoExportadas(List<int> ids) async {
     if (ids.isEmpty) return;
     final db = await database;
-    await db.update(
-      'cubagens_arvores',
-      {'exportada': 1},
-      where: 'id IN (${List.filled(ids.length, '?').join(',')})',
-      whereArgs: ids,
-    );
+    await db.update('cubagens_arvores', {'exportada': 1}, where: 'id IN (${List.filled(ids.length, '?').join(',')})', whereArgs: ids);
   }
   Future<String> importarCsvUniversal(String csvContent, {required int projetoIdAlvo}) async {
     final db = await database;
@@ -798,12 +738,7 @@ class DatabaseHelper {
               } else {
                   final parcelasDoBanco = await txn.query('parcelas', where: 'idParcela = ? AND talhaoId = ?', whereArgs: [idParcelaColeta, talhao.id!]);
                   if (parcelasDoBanco.isEmpty) {
-                      final novaParcela = Parcela(
-                          talhaoId: talhao.id!, idParcela: idParcelaColeta,
-                          areaMetrosQuadrados: double.tryParse(getValue(row, ['area_m2'])?.replaceAll(',', '.') ?? '0') ?? 0,
-                          status: StatusParcela.concluida, dataColeta: DateTime.now(),
-                          nomeFazenda: fazenda.nome, nomeTalhao: talhao.nome, isSynced: false,
-                      );
+                      final novaParcela = Parcela(talhaoId: talhao.id!, idParcela: idParcelaColeta, areaMetrosQuadrados: double.tryParse(getValue(row, ['area_m2'])?.replaceAll(',', '.') ?? '0') ?? 0, status: StatusParcela.concluida, dataColeta: DateTime.now(), nomeFazenda: fazenda.nome, nomeTalhao: talhao.nome, isSynced: false);
                       parcelaDbId = await txn.insert('parcelas', novaParcela.toMap());
                       parcelasCriadas++;
                   } else {
@@ -814,18 +749,8 @@ class DatabaseHelper {
 
               final codigoStr = getValue(row, ['codigo_arvore', 'codigo']);
               if (codigoStr != null) {
-                  // <<< CORREÇÃO APLICADA AQUI >>>
                   final dominante = getValue(row, ['dominante'])?.toLowerCase() == 'sim' || getValue(row, ['dominante'])?.toLowerCase() == 'true';
-
-                  final novaArvore = Arvore(
-                      cap: double.tryParse(getValue(row, ['cap_cm'])?.replaceAll(',', '.') ?? '0.0') ?? 0.0,
-                      altura: double.tryParse(getValue(row, ['altura_m'])?.replaceAll(',', '.') ?? ''),
-                      linha: int.tryParse(getValue(row, ['linha']) ?? '0') ?? 0,
-                      posicaoNaLinha: int.tryParse(getValue(row, ['posicao_na_linha']) ?? '0') ?? 0,
-                      dominante: dominante, // <<< VALOR CORRETO SENDO USADO
-                      codigo: Codigo.values.firstWhere((e) => e.name.toLowerCase() == codigoStr.toLowerCase(), orElse: () => Codigo.normal),
-                      fimDeLinha: false,
-                  );
+                  final novaArvore = Arvore(cap: double.tryParse(getValue(row, ['cap_cm'])?.replaceAll(',', '.') ?? '0.0') ?? 0.0, altura: double.tryParse(getValue(row, ['altura_m'])?.replaceAll(',', '.') ?? ''), linha: int.tryParse(getValue(row, ['linha']) ?? '0') ?? 0, posicaoNaLinha: int.tryParse(getValue(row, ['posicao_na_linha']) ?? '0') ?? 0, dominante: dominante, codigo: Codigo.values.firstWhere((e) => e.name.toLowerCase() == codigoStr.toLowerCase(), orElse: () => Codigo.normal), fimDeLinha: false);
                   final arvoreMap = novaArvore.toMap();
                   arvoreMap['parcelaId'] = parcelaDbId;
                   await txn.insert('arvores', arvoreMap);
@@ -844,15 +769,7 @@ class DatabaseHelper {
               } else {
                   final cubagensDoBanco = await txn.query('cubagens_arvores', where: 'talhaoId = ? AND identificador = ?', whereArgs: [talhao.id!, idArvore]);
                   if (cubagensDoBanco.isEmpty) {
-                    arvoreCubagem = CubagemArvore(
-                        talhaoId: talhao.id!, idFazenda: fazenda.id, nomeFazenda: fazenda.nome, nomeTalhao: talhao.nome,
-                        identificador: idArvore,
-                        alturaTotal: double.tryParse(getValue(row, ['altura_total_m'])?.replaceAll(',', '.') ?? '0') ?? 0,
-                        valorCAP: double.tryParse(getValue(row, ['valor_cap', 'cap_cm'])?.replaceAll(',', '.') ?? '0') ?? 0,
-                        alturaBase: double.tryParse(getValue(row, ['altura_base_m'])?.replaceAll(',', '.') ?? '0') ?? 0,
-                        tipoMedidaCAP: getValue(row, ['tipo_medida_cap']) ?? 'fita',
-                        isSynced: false,
-                    );
+                    arvoreCubagem = CubagemArvore(talhaoId: talhao.id!, idFazenda: fazenda.id, nomeFazenda: fazenda.nome, nomeTalhao: talhao.nome, identificador: idArvore, alturaTotal: double.tryParse(getValue(row, ['altura_total_m'])?.replaceAll(',', '.') ?? '0') ?? 0, valorCAP: double.tryParse(getValue(row, ['valor_cap', 'cap_cm'])?.replaceAll(',', '.') ?? '0') ?? 0, alturaBase: double.tryParse(getValue(row, ['altura_base_m'])?.replaceAll(',', '.') ?? '0') ?? 0, tipoMedidaCAP: getValue(row, ['tipo_medida_cap']) ?? 'fita', isSynced: false);
                     final cubagemId = await txn.insert('cubagens_arvores', arvoreCubagem.toMap());
                     arvoreCubagem = arvoreCubagem.copyWith(id: cubagemId);
                     cubagensCriadas++;
@@ -866,13 +783,7 @@ class DatabaseHelper {
               if (alturaMedicaoStr != null) {
                   final alturaMedicao = double.tryParse(alturaMedicaoStr.replaceAll(',', '.')) ?? -1;
                   if (alturaMedicao >= 0) {
-                      final novaSecao = CubagemSecao(
-                          cubagemArvoreId: arvoreCubagem.id!,
-                          alturaMedicao: alturaMedicao,
-                          circunferencia: double.tryParse(getValue(row, ['circunferencia_secao_cm', 'circunferencia_cm'])?.replaceAll(',', '.') ?? '0') ?? 0,
-                          casca1_mm: double.tryParse(getValue(row, ['casca1_mm'])?.replaceAll(',', '.') ?? '0') ?? 0,
-                          casca2_mm: double.tryParse(getValue(row, ['casca2_mm'])?.replaceAll(',', '.') ?? '0') ?? 0,
-                      );
+                      final novaSecao = CubagemSecao(cubagemArvoreId: arvoreCubagem.id!, alturaMedicao: alturaMedicao, circunferencia: double.tryParse(getValue(row, ['circunferencia_secao_cm', 'circunferencia_cm'])?.replaceAll(',', '.') ?? '0') ?? 0, casca1_mm: double.tryParse(getValue(row, ['casca1_mm'])?.replaceAll(',', '.') ?? '0') ?? 0, casca2_mm: double.tryParse(getValue(row, ['casca2_mm'])?.replaceAll(',', '.') ?? '0') ?? 0);
                       await txn.insert('cubagens_secoes', novaSecao.toMap());
                       secoesCriadas++;
                   }
@@ -887,10 +798,7 @@ class DatabaseHelper {
     }
   }
 
-  // --- MÉTODOS CRUD: SORTIMENTOS ---
-  Future<int> insertSortimento(SortimentoModel s) async =>
-      await (await database).insert('sortimentos', s.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
-
+  Future<int> insertSortimento(SortimentoModel s) async => await (await database).insert('sortimentos', s.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   Future<List<SortimentoModel>> getTodosSortimentos() async {
     final db = await database;
     final maps = await db.query('sortimentos', orderBy: 'nome ASC');
@@ -900,10 +808,8 @@ class DatabaseHelper {
     return List.generate(maps.length, (i) => SortimentoModel.fromMap(maps[i]));
   }
 
-  Future<void> deleteSortimento(int id) async =>
-      await (await database).delete('sortimentos', where: 'id = ?', whereArgs: [id]);
+  Future<void> deleteSortimento(int id) async => await (await database).delete('sortimentos', where: 'id = ?', whereArgs: [id]);
       
-  // --- MÉTODOS DE SEGURANÇA E SINCRONIZAÇÃO ---
   Future<void> deleteDatabaseFile() async {
     if (_database != null && _database!.isOpen) {
       await _database!.close();
@@ -930,13 +836,11 @@ class DatabaseHelper {
     final maps = await db.query('cubagens_arvores', where: 'exportada = ?', whereArgs: [0]);
     return List.generate(maps.length, (i) => CubagemArvore.fromMap(maps[i]));
   }
-
   Future<List<CubagemArvore>> getTodasCubagensParaBackup() async {
     final db = await database;
     final maps = await db.query('cubagens_arvores');
     return List.generate(maps.length, (i) => CubagemArvore.fromMap(maps[i]));
   }
-
   Future<void> markCubagemAsSynced(int id) async {
     final db = await database;
     await db.update('cubagens_arvores', {'isSynced': 1}, where: 'id = ?', whereArgs: [id]);

@@ -1,4 +1,4 @@
-// lib/pages/fazenda/form_fazenda_page.dart
+// lib/pages/fazenda/form_fazenda_page.dart (VERSÃO COM CORREÇÃO DE UPDATE)
 
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
@@ -64,15 +64,27 @@ class _FormFazendaPageState extends State<FormFazendaPage> {
       );
 
       try {
-        final dbHelper = DatabaseHelper.instance;
+        final db = await DatabaseHelper.instance.database;
         
         if (widget.isEditing) {
-            // No modo de edição, não podemos simplesmente dar update no ID, pois ele faz parte da chave primária.
-            // A melhor abordagem é apagar e inserir novamente, garantindo que o ID permaneça o mesmo.
-            // O DatabaseHelper não tem um método update para fazenda, então esta é a lógica correta.
-            await dbHelper.deleteFazenda(widget.fazendaParaEditar!.id, widget.fazendaParaEditar!.atividadeId);
+            // <<< INÍCIO DA CORREÇÃO >>>
+            // Cria um mapa com apenas os campos que podem ser atualizados.
+            final dadosParaAtualizar = {
+              'nome': fazenda.nome,
+              'municipio': fazenda.municipio,
+              'estado': fazenda.estado,
+            };
+
+            await db.update(
+              'fazendas',
+              dadosParaAtualizar, // Usa o mapa corrigido
+              where: 'id = ? AND atividadeId = ?',
+              whereArgs: [widget.fazendaParaEditar!.id, widget.fazendaParaEditar!.atividadeId],
+            );
+            // <<< FIM DA CORREÇÃO >>>
+        } else {
+            await db.insert('fazendas', fazenda.toMap(), conflictAlgorithm: ConflictAlgorithm.fail);
         }
-        await dbHelper.insertFazenda(fazenda);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -123,7 +135,6 @@ class _FormFazendaPageState extends State<FormFazendaPage> {
             children: [
               TextFormField(
                 controller: _idController,
-                // <<< ALTERAÇÃO PRINCIPAL AQUI >>>
                 enabled: !widget.isEditing,
                 style: TextStyle(
                   color: widget.isEditing ? Colors.grey.shade600 : null,
@@ -132,9 +143,8 @@ class _FormFazendaPageState extends State<FormFazendaPage> {
                   labelText: 'ID da Fazenda (Código do Cliente)',
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.vpn_key_outlined),
-                  // Adiciona uma cor de preenchimento para indicar que está desabilitado
                   filled: widget.isEditing,
-                  fillColor: Colors.grey.shade200,
+                  fillColor: widget.isEditing ? Colors.grey.shade200 : null,
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {

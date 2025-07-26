@@ -1,4 +1,4 @@
-// lib/pages/talhoes/form_talhao_page.dart
+// lib/pages/talhoes/form_talhao_page.dart (VERSÃO COM LÓGICA DE EDIÇÃO CORRIGIDA)
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,15 +8,16 @@ import 'package:geoforestcoletor/models/talhao_model.dart';
 class FormTalhaoPage extends StatefulWidget {
   final String fazendaId;
   final int fazendaAtividadeId;
-  final Talhao? talhaoParaEditar; // <<< 1. NOVO PARÂMETRO OPCIONAL
+  final Talhao? talhaoParaEditar; // Parâmetro para o modo de edição
 
   const FormTalhaoPage({
     super.key,
     required this.fazendaId,
     required this.fazendaAtividadeId,
-    this.talhaoParaEditar, // Adicionado ao construtor
+    this.talhaoParaEditar,
   });
 
+  // Getter para saber facilmente se estamos no modo de edição
   bool get isEditing => talhaoParaEditar != null;
 
   @override
@@ -36,12 +37,13 @@ class _FormTalhaoPageState extends State<FormTalhaoPage> {
   @override
   void initState() {
     super.initState();
-    // <<< 2. LÓGICA PARA PRÉ-PREENCHER O FORMULÁRIO >>>
+    // Se estivermos editando, preenchemos o formulário com os dados existentes.
     if (widget.isEditing) {
       final talhao = widget.talhaoParaEditar!;
       _nomeController.text = talhao.nome;
       _especieController.text = talhao.especie ?? '';
       _espacamentoController.text = talhao.espacamento ?? '';
+      // Converte para string com vírgula para exibição correta
       _areaController.text = talhao.areaHa?.toString().replaceAll('.', ',') ?? '';
       _idadeController.text = talhao.idadeAnos?.toString().replaceAll('.', ',') ?? '';
     }
@@ -57,13 +59,14 @@ class _FormTalhaoPageState extends State<FormTalhaoPage> {
     super.dispose();
   }
 
-  // <<< 3. FUNÇÃO DE SALVAR ATUALIZADA >>>
+  // <<< INÍCIO DA CORREÇÃO PRINCIPAL >>>
   Future<void> _salvar() async {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() => _isSaving = true);
 
+      // Constrói o objeto Talhao.
+      // Se estiver editando, usa o ID existente. Se for novo, o ID é nulo.
       final talhao = Talhao(
-        // Se estiver editando, usa o ID existente, senão é nulo para autoincremento
         id: widget.isEditing ? widget.talhaoParaEditar!.id : null,
         fazendaId: widget.fazendaId,
         fazendaAtividadeId: widget.fazendaAtividadeId,
@@ -78,14 +81,16 @@ class _FormTalhaoPageState extends State<FormTalhaoPage> {
         final dbHelper = DatabaseHelper.instance;
         
         if (widget.isEditing) {
-          // O método `update` do SQFlite precisa de um WHERE, então usamos o ID
-          await dbHelper.database.then((db) => db.update(
+          // Se estamos editando, usamos o método 'update' do SQFlite.
+          final db = await dbHelper.database;
+          await db.update(
             'talhoes',
             talhao.toMap(),
-            where: 'id = ?',
+            where: 'id = ?', // A condição WHERE é crucial para atualizar o registro correto
             whereArgs: [talhao.id],
-          ));
+          );
         } else {
+          // Se for novo, usamos o método de inserir que já existia.
           await dbHelper.insertTalhao(talhao);
         }
 
@@ -96,7 +101,7 @@ class _FormTalhaoPageState extends State<FormTalhaoPage> {
               backgroundColor: Colors.green
             ),
           );
-          Navigator.of(context).pop(true);
+          Navigator.of(context).pop(true); // Retorna true para a tela anterior saber que precisa recarregar
         }
       } catch (e) {
         if (mounted) {
@@ -111,12 +116,13 @@ class _FormTalhaoPageState extends State<FormTalhaoPage> {
       }
     }
   }
+  // <<< FIM DA CORREÇÃO PRINCIPAL >>>
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // <<< 4. TÍTULO E BOTÃO DINÂMICOS >>>
       appBar: AppBar(
+        // O título agora é dinâmico, dependendo do modo
         title: Text(widget.isEditing ? 'Editar Talhão' : 'Novo Talhão'),
       ),
       body: SingleChildScrollView(

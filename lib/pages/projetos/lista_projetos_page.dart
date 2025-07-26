@@ -1,4 +1,4 @@
-// lib/pages/projetos/lista_projetos_page.dart (VERSÃO FINAL COM GERENCIAMENTO E IMPORTAÇÃO)
+// lib/pages/projetos/lista_projetos_page.dart (VERSÃO FINAL COM PERMISSÕES RESTAURADAS PARA TODOS)
 
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -37,31 +37,27 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   bool _isSelectionMode = false;
   final Set<int> _selectedProjetos = {};
   
-  // Variável para saber se o usuário tem permissões de gerente
+  // A variável 'isGerente' agora é usada APENAS para a função de arquivar e para a lista de projetos.
   bool _isGerente = false;
 
   @override
   void initState() {
     super.initState();
-    // A verificação do cargo é feita antes de carregar os projetos
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkUserRoleAndLoadProjects();
     });
   }
 
-  /// Verifica o cargo do usuário logado e carrega a lista de projetos apropriada.
   Future<void> _checkUserRoleAndLoadProjects() async {
-    // Usa o Provider para obter os dados da licença, que contém o cargo
     final licenseProvider = context.read<LicenseProvider>();
     setState(() {
       _isGerente = licenseProvider.licenseData?.cargo == 'gerente';
       _isLoading = true;
     });
 
-    // Carrega a lista de projetos com base no cargo
     final data = _isGerente
-        ? await dbHelper.getTodosOsProjetosParaGerente() // Gerente vê todos (ativos e arquivados)
-        : await dbHelper.getTodosProjetos();             // Equipe de campo vê apenas os ativos
+        ? await dbHelper.getTodosOsProjetosParaGerente()
+        : await dbHelper.getTodosProjetos();
 
     if (mounted) {
       setState(() {
@@ -71,9 +67,10 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
     }
   }
 
-  /// Alterna o status de um projeto entre 'ativo' e 'arquivado'.
-  /// Esta função só é acessível pela interface do gerente.
+  // A função de arquivar continua sendo exclusiva do gerente.
   Future<void> _toggleArchiveStatus(Projeto projeto) async {
+    if (!_isGerente) return;
+
     final novoStatus = projeto.status == 'ativo' ? 'arquivado' : 'ativo';
     final acao = novoStatus == 'arquivado' ? 'Arquivar' : 'Reativar';
 
@@ -98,12 +95,10 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
     if (confirmar == true && mounted) {
       setState(() => _isLoading = true);
       try {
-        // 1. Atualiza o objeto no banco de dados local primeiro
         final projetoAtualizado = projeto.copyWith(status: novoStatus);
         final db = await dbHelper.database;
         await db.update('projetos', projetoAtualizado.toMap(), where: 'id = ?', whereArgs: [projeto.id]);
 
-        // 2. Chama o serviço para replicar a mudança no Firebase
         final syncService = SyncService();
         await syncService.atualizarStatusProjetoNaFirebase(projeto.id!.toString(), novoStatus);
 
@@ -111,7 +106,6 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
           SnackBar(content: Text('Projeto ${projeto.nome} foi atualizado para "$novoStatus".'), backgroundColor: Colors.green),
         );
         
-        // 3. Recarrega a lista da tela para refletir a mudança visual
         await _checkUserRoleAndLoadProjects();
 
       } catch (e) {
@@ -128,7 +122,6 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
     }
   }
 
-  /// Inicia o fluxo de seleção de arquivo e importação para um projeto específico.
   Future<void> _iniciarImportacao(Projeto projeto) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -163,7 +156,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
       final message = await DatabaseHelper.instance.importarCsvUniversal(csvContent, projetoIdAlvo: projeto.id!);
       
       if (mounted) {
-        Navigator.of(context).pop(); // Fecha o dialog de "processando"
+        Navigator.of(context).pop();
         await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -172,7 +165,6 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
             actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
           ),
         );
-        // Fecha a tela de seleção de projetos após a importação ser concluída
         Navigator.of(context).pop(); 
       }
     } catch (e) {
@@ -260,8 +252,9 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
           : projetos.isEmpty
               ? _buildEmptyState()
               : _buildListView(),
-      // O botão de adicionar só aparece para gerentes e quando não está no modo de importação
-      floatingActionButton: (widget.isImporting || !_isGerente) ? null : _buildAddProjectButton(),
+      // <<< PERMISSÃO RESTAURADA >>>
+      // O botão de adicionar agora aparece para todos, exceto no modo de importação.
+      floatingActionButton: widget.isImporting ? null : _buildAddProjectButton(),
     );
   }
   
@@ -276,10 +269,12 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
 
         return Slidable(
           key: ValueKey(projeto.id),
-          // Ações de deslizar só estão disponíveis para o gerente e fora do modo de importação
-          startActionPane: (_isGerente && !widget.isImporting) ? ActionPane(
+          // <<< PERMISSÃO RESTAURADA >>>
+          // As ações de deslizar agora estão disponíveis para todos,
+          // com uma condição interna apenas para o botão de arquivar.
+          startActionPane: ActionPane(
             motion: const DrawerMotion(),
-            extentRatio: 0.5, // Aumenta o espaço para dois botões
+            extentRatio: _isGerente ? 0.5 : 0.25, // O gerente vê 2 botões, a equipe vê 1.
             children: [
               SlidableAction(
                 onPressed: (_) => _navegarParaEdicao(projeto),
@@ -288,17 +283,18 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
                 icon: Icons.edit_outlined,
                 label: 'Editar',
               ),
-              SlidableAction(
-                onPressed: (_) => _toggleArchiveStatus(projeto),
-                backgroundColor: isArchived ? Colors.green.shade600 : Colors.orange.shade700,
-                foregroundColor: Colors.white,
-                icon: isArchived ? Icons.unarchive_outlined : Icons.archive_outlined,
-                label: isArchived ? 'Reativar' : 'Arquivar',
-              ),
+              // O botão de arquivar continua sendo exclusivo do gerente
+              if (_isGerente)
+                SlidableAction(
+                  onPressed: (_) => _toggleArchiveStatus(projeto),
+                  backgroundColor: isArchived ? Colors.green.shade600 : Colors.orange.shade700,
+                  foregroundColor: Colors.white,
+                  icon: isArchived ? Icons.unarchive_outlined : Icons.archive_outlined,
+                  label: isArchived ? 'Reativar' : 'Arquivar',
+                ),
             ],
-          ) : null,
+          ),
           child: Card(
-            // Estilo visual para projetos arquivados e selecionados
             color: isArchived ? Colors.grey.shade300 : (isSelected ? Colors.lightBlue.shade100 : null),
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: ListTile(
@@ -311,7 +307,9 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
                   _navegarParaDetalhes(projeto);
                 }
               },
-              onLongPress: (_isGerente && !widget.isImporting) ? () => _toggleSelection(projeto.id!) : null,
+              // <<< PERMISSÃO RESTAURADA >>>
+              // A seleção por toque longo agora está disponível para todos.
+              onLongPress: () => _toggleSelection(projeto.id!),
               leading: Icon(
                 isSelected ? Icons.check_circle : (isArchived ? Icons.archive_rounded : Icons.folder_outlined),
                 color: isArchived ? Colors.grey.shade700 : Theme.of(context).primaryColor,
@@ -354,7 +352,9 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
           const Icon(Icons.folder_off_outlined, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
           const Text('Nenhum projeto encontrado.', style: TextStyle(fontSize: 18)),
-          if (!widget.isImporting && _isGerente)
+          // <<< PERMISSÃO RESTAURADA >>>
+          // A mensagem de ajuda aparece para todos.
+          if (!widget.isImporting)
             const Text('Use o botão "+" para adicionar um novo.', style: TextStyle(color: Colors.grey)),
         ],
       ),

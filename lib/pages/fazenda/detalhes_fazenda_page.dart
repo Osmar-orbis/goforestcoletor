@@ -1,4 +1,4 @@
-// lib/pages/fazenda/detalhes_fazenda_page.dart (VERSÃO CORRIGIDA)
+// lib/pages/fazenda/detalhes_fazenda_page.dart (VERSÃO COM NAVEGAÇÃO CORRIGIDA)
 
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -8,7 +8,6 @@ import 'package:geoforestcoletor/models/fazenda_model.dart';
 import 'package:geoforestcoletor/models/talhao_model.dart';
 import 'package:geoforestcoletor/pages/talhoes/form_talhao_page.dart';
 import 'package:geoforestcoletor/pages/talhoes/detalhes_talhao_page.dart';
-import 'package:geoforestcoletor/pages/menu/home_page.dart';
 
 class DetalhesFazendaPage extends StatefulWidget {
   final Fazenda fazenda;
@@ -35,28 +34,22 @@ class _DetalhesFazendaPageState extends State<DetalhesFazendaPage> {
     _carregarTalhoes();
   }
 
-  // =========================================================================
-  // <<< CORREÇÃO APLICADA AQUI >>>
-  // A função agora carrega TODOS os talhões, sem filtros.
-  // =========================================================================
   void _carregarTalhoes() async {
     if (mounted) {
       setState(() {
-        _isLoading = true; // Inicia o loading
+        _isLoading = true;
         _isSelectionMode = false;
         _selectedTalhoes.clear();
       });
     }
 
-    // 1. Busca todos os talhões da fazenda diretamente.
     final todosOsTalhoes = await dbHelper.getTalhoesDaFazenda(
         widget.fazenda.id, widget.fazenda.atividadeId);
 
-    // 2. Atualiza o estado da tela com a lista completa.
     if (mounted) {
       setState(() {
         _talhoes = todosOsTalhoes;
-        _isLoading = false; // Finaliza o loading
+        _isLoading = false;
       });
     }
   }
@@ -181,12 +174,9 @@ class _DetalhesFazendaPageState extends State<DetalhesFazendaPage> {
         IconButton(
           icon: const Icon(Icons.home_outlined),
           tooltip: 'Voltar para o Início',
-          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-                builder: (context) =>
-                    const HomePage(title: 'Geo Forest Analytics')),
-            (Route<dynamic> route) => false,
-          ),
+          // <<< CORREÇÃO DA NAVEGAÇÃO >>>
+          // Em vez de recriar a HomePage, ele "desempilha" as telas até chegar na primeira.
+          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
         ),
       ],
     );
@@ -237,7 +227,6 @@ class _DetalhesFazendaPageState extends State<DetalhesFazendaPage> {
                     ? Center(
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
-                          // Mensagem atualizada para ser mais genérica
                           child: Text(
                             'Nenhum talhão encontrado.\nClique no botão "+" para adicionar o primeiro.',
                             textAlign: TextAlign.center,
