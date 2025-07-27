@@ -1,4 +1,4 @@
-// lib/pages/amostra/coleta_dados_page.dart (VERSÃO COM CORREÇÃO DE NULL CHECK)
+// lib/pages/amostra/coleta_dados_page.dart (VERSÃO COM CORREÇÃO FINAL)
 
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -10,12 +10,12 @@ import 'package:geoforestcoletor/pages/amostra/inventario_page.dart';
 import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:proj4dart/proj4dart.dart' as proj4;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:path/path.dart' as path;
 import 'package:geoforestcoletor/services/permission_service.dart';
 import 'package:image/image.dart' as img;
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 
 
 enum FormaParcela { retangular, circular }
@@ -150,7 +150,6 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
     );
   }
 
-  // <<< INÍCIO DA CORREÇÃO DE NULL CHECK >>>
   Future<void> _pickImage(ImageSource source) async {
     final XFile? pickedFile = await _picker.pickImage(source: source, imageQuality: 85, maxWidth: 1280);
     if (pickedFile == null) return;
@@ -167,7 +166,6 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
         throw Exception("A parcela precisa ser salva e vinculada a um talhão antes de adicionar fotos.");
       }
 
-      // 1. Obter o Talhão e, a partir dele, a Atividade para encontrar o Projeto.
       final db = await dbHelper.database;
       final talhaoMaps = await db.query('talhoes', where: 'id = ?', whereArgs: [_parcelaAtual.talhaoId]);
       if (talhaoMaps.isEmpty) throw Exception("Talhão vinculado não encontrado no banco de dados.");
@@ -175,7 +173,6 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
       final talhao = Talhao.fromMap(talhaoMaps.first);
       final projeto = await dbHelper.getProjetoPelaAtividade(talhao.fazendaAtividadeId);
 
-      // 2. Montar o nome do arquivo com todas as informações
       final projetoNome = projeto?.nome.replaceAll(RegExp(r'[^\w\s-]'), '') ?? 'PROJETO';
       final fazendaNome = _parcelaAtual.nomeFazenda?.replaceAll(RegExp(r'[^\w\s-]'), '') ?? 'FAZENDA';
       final talhaoNome = _parcelaAtual.nomeTalhao?.replaceAll(RegExp(r'[^\w\s-]'), '') ?? 'TALHAO';
@@ -201,7 +198,7 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
                               "Fazenda: $fazendaNome | Talhao: $talhaoNome | Parcela: $idParcela\n"
                               "$utmString | $dataHoraFormatada";
 
-      // 3. O resto da lógica de salvar e aplicar a marca d'água
+      // Lógica de salvamento original
       final directory = await getDownloadsDirectory();
       if (directory == null) throw Exception("Não foi possível acessar a pasta de Downloads.");
       final geoForestDir = Directory(path.join(directory.path, 'GeoForest', 'Fotos'));
