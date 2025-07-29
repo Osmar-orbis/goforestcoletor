@@ -67,50 +67,59 @@ class LicenseProvider with ChangeNotifier {
   // <<< 3. FUNÇÃO DE BUSCA DE DADOS COMPLETAMENTE REESCRITA >>>
   // =======================================================================
   Future<void> fetchLicenseData() async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      clearLicenseData();
-      return;
-    }
-
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      // Usa o serviço para encontrar o documento da licença da empresa
-      final doc = await _licensingService.findLicenseDocumentForUser(user);
-
-      if (doc != null && doc.exists) {
-        final data = doc.data()!;
-        final trialData = data['trial'] as Map<String, dynamic>?;
-        
-        // Extrai o mapa de usuários permitidos
-        final usuariosPermitidos = data['usuariosPermitidos'] as Map<String, dynamic>? ?? {};
-        
-        // Extrai o cargo específico do usuário logado a partir do seu UID
-        final cargoDoUsuario = usuariosPermitidos[user.uid] as String? ?? 'equipe'; // Padrão 'equipe' por segurança
-
-        _licenseData = LicenseData(
-          id: doc.id,
-          status: data['statusAssinatura'] ?? 'inativa',
-          trialEndDate: (trialData?['dataFim'] as Timestamp?)?.toDate(),
-          features: data['features'] ?? {},
-          limites: data['limites'] ?? {},
-          cargo: cargoDoUsuario, // Salva o cargo no nosso modelo
-        );
-      } else {
-        _error = "Sua conta não foi encontrada em nenhuma licença ativa.";
-        _licenseData = null; // Garante que a licença antiga seja limpa
-      }
-    } catch (e) {
-      _error = "Erro ao buscar dados da licença: $e";
-       _licenseData = null;
-    }
-
-    _isLoading = false;
-    notifyListeners();
+  final user = _auth.currentUser;
+  if (user == null) {
+    clearLicenseData();
+    return;
   }
+
+  _isLoading = true;
+  _error = null;
+  notifyListeners();
+
+  try {
+    final doc = await _licensingService.findLicenseDocumentForUser(user);
+
+    if (doc != null && doc.exists) {
+      final data = doc.data()!;
+      final trialData = data['trial'] as Map<String, dynamic>?;
+      
+      // <<< MUDANÇA NA LÓGICA PARA PEGAR O CARGO >>>
+      String cargoDoUsuario = 'equipe'; // Padrão de segurança
+      final membros = data['membros'] as List<dynamic>? ?? [];
+      
+      // Procura no array de mapas pelo mapa que contém o UID do nosso usuário.
+      final membroData = membros.firstWhere(
+        (m) => m is Map && m['uid'] == user.uid,
+        orElse: () => null,
+      );
+
+      if (membroData != null) {
+        cargoDoUsuario = membroData['cargo'] as String? ?? 'equipe';
+      }
+      
+      print('--- DEBUG: Cargo identificado para ${user.email}: $cargoDoUsuario');
+
+      _licenseData = LicenseData(
+        id: doc.id,
+        status: data['statusAssinatura'] ?? 'inativa',
+        trialEndDate: (trialData?['dataFim'] as Timestamp?)?.toDate(),
+        features: data['features'] ?? {},
+        limites: data['limites'] ?? {},
+        cargo: cargoDoUsuario,
+      );
+    } else {
+      _error = "Sua conta não foi encontrada em nenhuma licença ativa.";
+      _licenseData = null;
+    }
+  } catch (e) {
+    _error = "Erro ao buscar dados da licença: $e";
+     _licenseData = null;
+  }
+
+  _isLoading = false;
+  notifyListeners();
+}
 
   void clearLicenseData() {
     _licenseData = null;

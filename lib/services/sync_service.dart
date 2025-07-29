@@ -1,4 +1,4 @@
-// lib/services/sync_service.dart (VERSÃO FINAL, COMPLETA E CORRIGIDA)
+// lib/services/sync_service.dart (VERSÃO COM SINCRONIZAÇÃO CORRIGIDA PARA GERENTE)
 
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -32,17 +32,26 @@ class SyncService {
     final usuariosPermitidos = licenseData['usuariosPermitidos'] as Map<String, dynamic>? ?? {};
     final cargo = usuariosPermitidos[user.uid] as String? ?? 'equipe';
 
-    // A lógica de fluxo está correta para ambos os cenários
+    // ===================================================================
+    // ====================== INÍCIO DA ALTERAÇÃO ========================
+    // ===================================================================
     if (cargo == 'gerente') {
-      debugPrint("Sincronização em modo GERENTE: Upload da estrutura e das coletas.");
+      debugPrint("Sincronização em modo GERENTE: Upload e Download completos.");
+      // 1. Envia as modificações locais para a nuvem.
       await _uploadHierarquiaCompleta(licenseId);
-      await _uploadColetasNaoSincronizadas(licenseId); 
+      await _uploadColetasNaoSincronizadas(licenseId);
+      // 2. Baixa as atualizações da nuvem para o dispositivo local.
+      await _downloadHierarquiaCompleta(licenseId);
+      await _downloadColetas(licenseId);
     } else {
       debugPrint("Sincronização em modo EQUIPE: Upload de coletas e Download geral.");
       await _uploadColetasNaoSincronizadas(licenseId);
       await _downloadHierarquiaCompleta(licenseId);
       await _downloadColetas(licenseId);
     }
+    // ===================================================================
+    // ======================= FIM DA ALTERAÇÃO ==========================
+    // ===================================================================
   }
 
   /// Envia a estrutura completa (Projetos, Atividades, Fazendas, Talhões e Plano de Parcelas)
@@ -138,11 +147,6 @@ class SyncService {
     }
   }
   
-  // ===================================================================
-  // AS FUNÇÕES DE DOWNLOAD NÃO PRECISAM DE ALTERAÇÕES.
-  // Elas já estão corretas.
-  // ===================================================================
-  
   Future<void> _downloadHierarquiaCompleta(String licenseId) async {
     final db = await _dbHelper.database;
     
@@ -186,15 +190,14 @@ class SyncService {
 
     final db = await _dbHelper.database;
     int novasParcelas = 0;
+    int parcelasAtualizadas = 0;
 
     for (final docSnapshot in querySnapshot.docs) {
       final dadosDaNuvem = docSnapshot.data();
       final parcelaDaNuvem = Parcela.fromMap(dadosDaNuvem);
       
-      // A lógica para baixar APENAS se a parcela não existir localmente está correta
-      final parcelaLocalExistente = await db.query('parcelas', where: 'uuid = ?', whereArgs: [parcelaDaNuvem.uuid]);
-      if (parcelaLocalExistente.isNotEmpty) continue;
-
+      final parcelaLocalResult = await db.query('parcelas', where: 'uuid = ?', whereArgs: [parcelaDaNuvem.uuid], limit: 1);
+      
       await db.transaction((txn) async {
         try {
           final talhaoIdLocal = parcelaDaNuvem.talhaoId;
@@ -202,26 +205,42 @@ class SyncService {
           
           final pMap = parcelaDaNuvem.toMap();
           pMap['isSynced'] = 1;
-          pMap.remove('id');
-
-          final novoIdParcelaLocal = await txn.insert('parcelas', pMap);
-
-          final arvoresSnapshot = await docSnapshot.reference.collection('arvores').get();
-          if (arvoresSnapshot.docs.isNotEmpty) {
-            final arvoresDaNuvem = arvoresSnapshot.docs.map((doc) => Arvore.fromMap(doc.data())).toList();
-            for (final arvore in arvoresDaNuvem) {
-              final aMap = arvore.toMap();
-              aMap['parcelaId'] = novoIdParcelaLocal;
-              await txn.insert('arvores', aMap);
-            }
+          
+          if (parcelaLocalResult.isEmpty) {
+            // Se não existe localmente, insere
+            pMap.remove('id');
+            final novoIdParcelaLocal = await txn.insert('parcelas', pMap);
+            await _sincronizarArvores(txn, docSnapshot, novoIdParcelaLocal);
+            novasParcelas++;
+          } else {
+            // Se já existe, atualiza
+            final parcelaLocal = Parcela.fromMap(parcelaLocalResult.first);
+            pMap['id'] = parcelaLocal.dbId; // Garante que estamos atualizando o registro certo
+            await txn.update('parcelas', pMap, where: 'id = ?', whereArgs: [parcelaLocal.dbId]);
+            await txn.delete('arvores', where: 'parcelaId = ?', whereArgs: [parcelaLocal.dbId]);
+            await _sincronizarArvores(txn, docSnapshot, parcelaLocal.dbId!);
+            parcelasAtualizadas++;
           }
-          novasParcelas++;
         } catch (e, s) {
           debugPrint("Erro CRÍTICO ao sincronizar parcela ${parcelaDaNuvem.uuid}: $e\n$s");
         }
       });
     }
     if (novasParcelas > 0) debugPrint("$novasParcelas novas parcelas foram baixadas da nuvem.");
+    if (parcelasAtualizadas > 0) debugPrint("$parcelasAtualizadas parcelas existentes foram atualizadas.");
+  }
+  
+  // Função auxiliar para evitar repetição de código
+  Future<void> _sincronizarArvores(DatabaseExecutor txn, firestore.DocumentSnapshot docSnapshot, int idParcelaLocal) async {
+      final arvoresSnapshot = await docSnapshot.reference.collection('arvores').get();
+      if (arvoresSnapshot.docs.isNotEmpty) {
+        final arvoresDaNuvem = arvoresSnapshot.docs.map((doc) => Arvore.fromMap(doc.data())).toList();
+        for (final arvore in arvoresDaNuvem) {
+          final aMap = arvore.toMap();
+          aMap['parcelaId'] = idParcelaLocal;
+          await txn.insert('arvores', aMap, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      }
   }
   
   Future<void> _downloadCubagensDaNuvem(String licenseId) async {

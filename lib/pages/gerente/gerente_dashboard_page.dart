@@ -176,7 +176,7 @@ class GerenteDashboardPage extends StatelessWidget {
       elevation: 2,
       child: Container(
         padding: const EdgeInsets.all(16.0),
-        height: 350, // Altura similar à do seu card original
+        height: 350,
         alignment: Alignment.center,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

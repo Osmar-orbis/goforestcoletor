@@ -1,4 +1,4 @@
-// lib/pages/gerente/gerente_map_page.dart (VERSÃO CORRIGIDA DOS ERROS DE COMPILAÇÃO)
+// lib\pages\gerente\gerente_map_page.dart (VERSÃO CORRIGIDA)
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -8,16 +8,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
-// <<< CORREÇÃO 3: Classe auxiliar movida para o topo para melhor organização >>>
+// Classe auxiliar movida para fora da classe de estado
 class MapLayer {
-  // <<< CORREÇÃO 1: Variáveis da classe declaradas aqui >>>
   final String name;
   final IconData icon;
   final TileLayer tileLayer;
 
   MapLayer({required this.name, required this.icon, required this.tileLayer});
 }
-
 
 class GerenteMapPage extends StatefulWidget {
   const GerenteMapPage({super.key});
@@ -29,7 +27,6 @@ class GerenteMapPage extends StatefulWidget {
 class _GerenteMapPageState extends State<GerenteMapPage> {
   final MapController _mapController = MapController();
   
-  // A lista agora usa a classe corrigida
   static final List<MapLayer> _mapLayers = [
     MapLayer(
       name: 'Ruas',
@@ -56,7 +53,7 @@ class _GerenteMapPageState extends State<GerenteMapPage> {
   @override
   void initState() {
     super.initState();
-    _currentLayer = _mapLayers[1]; // Inicia com o satélite
+    _currentLayer = _mapLayers[1];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _centerMapOnMarkers();
     });
@@ -90,11 +87,11 @@ class _GerenteMapPageState extends State<GerenteMapPage> {
         return Colors.orange.shade700;
       case StatusParcela.pendente:
         return Colors.grey.shade600;
+      // <<< CASO FALTANTE ADICIONADO >>>
       case StatusParcela.exportada:
-        return Colors.blue; // <<< CORREÇÃO 2: Adicionado o retorno para este caso
+        return Colors.blue;
     }
   }
-
   void _switchMapLayer() {
     setState(() {
       final currentIndex = _mapLayers.indexOf(_currentLayer);

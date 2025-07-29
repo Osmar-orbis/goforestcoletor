@@ -1,4 +1,4 @@
-// lib/services/licensing_service.dart (VERSÃO ATUALIZADA PARA O NOVO MODELO)
+// lib/services/licensing_service.dart (VERSÃO COM SINTAXE DO 'WHERE' CORRIGIDA)
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -16,35 +16,36 @@ class LicenseException implements Exception {
 class LicensingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // =======================================================================
-  // <<< 1. NOVA FUNÇÃO PARA ENCONTRAR A LICENÇA CORRETA >>>
-  // =======================================================================
-  /// Busca na coleção 'clientes' por um documento que contenha o UID do usuário no mapa 'usuariosPermitidos'.
+  /// Busca na coleção 'clientes' por um documento onde o array 'membrosUids' contenha o UID do usuário.
   Future<DocumentSnapshot<Map<String, dynamic>>?> findLicenseDocumentForUser(User user) async {
     print('--- DEBUG: Buscando licença para o UID: ${user.uid}');
-    // A consulta usa a notação de ponto para verificar se a chave (o UID do usuário) existe no mapa.
+    
+    // =======================================================================
+    // <<< CORREÇÃO APLICADA AQUI >>>
+    // Trocamos '.where('membrosUids', 'array-contains', user.uid)'
+    // por '.where('membrosUids', arrayContains: user.uid)'
+    // =======================================================================
     final query = _firestore
         .collection('clientes')
-        .where('usuariosPermitidos.${user.uid}', isNotEqualTo: null)
+        .where('membrosUids', arrayContains: user.uid) // <-- SINTAXE CORRETA
         .limit(1);
 
     final snapshot = await query.get();
 
     if (snapshot.docs.isNotEmpty) {
-      return snapshot.docs.first; // Retorna o documento da licença encontrado
+      print('--- DEBUG: Licença encontrada! Documento ID: ${snapshot.docs.first.id}');
+      return snapshot.docs.first;
     }
-    return null; // Retorna nulo se o usuário não estiver em nenhuma licença
+    
+    print('--- DEBUG: NENHUMA licença encontrada para este UID.');
+    return null;
   }
 
-  // =======================================================================
-  // <<< 2. MÉTODO PRINCIPAL ATUALIZADO >>>
-  // =======================================================================
+  /// Verifica a licença e registra o dispositivo do usuário.
   Future<void> checkAndRegisterDevice(User user) async {
-    // Usa a nova função de busca em vez de acessar o documento diretamente pelo UID.
     final clienteDoc = await findLicenseDocumentForUser(user);
 
     if (clienteDoc == null || !clienteDoc.exists) {
-      // A mensagem de erro agora é mais clara para o novo contexto.
       throw LicenseException('Sua conta não está associada a nenhuma licença ativa. Contate o administrador da sua empresa.');
     }
 
@@ -52,7 +53,6 @@ class LicensingService {
     final statusAssinatura = clienteData['statusAssinatura'];
     final limites = clienteData['limites'] as Map<String, dynamic>?;
 
-    // A lógica de verificação de status (ativa/trial) permanece a mesma e está correta.
     bool acessoPermitido = false;
     if (statusAssinatura == 'ativa') {
       acessoPermitido = true;
@@ -76,7 +76,6 @@ class LicensingService {
       throw LicenseException('Os limites do seu plano não estão configurados corretamente.');
     }
 
-    // A lógica de registro do dispositivo já está correta e pode ser mantida.
     final tipoDispositivo = kIsWeb ? 'desktop' : 'smartphone';
     final deviceId = await _getDeviceId();
 
@@ -88,7 +87,8 @@ class LicensingService {
     final dispositivoExistente = await dispositivosAtivosRef.doc(deviceId).get();
 
     if (dispositivoExistente.exists) {
-      return; // Dispositivo já conhecido.
+      print("--- DEBUG: Dispositivo $deviceId já registrado.");
+      return;
     }
 
     final contagemAtualSnapshot = await dispositivosAtivosRef.where('tipo', isEqualTo: tipoDispositivo).count().get();
@@ -106,17 +106,13 @@ class LicensingService {
       'registradoEm': FieldValue.serverTimestamp(),
       'nomeDispositivo': await _getDeviceName(),
     });
+    print("--- DEBUG: Novo dispositivo $deviceId registrado com sucesso!");
   }
 
-  // =======================================================================
-  // <<< 3. MÉTODO AUXILIAR ATUALIZADO PARA CONSISTÊNCIA >>>
-  // =======================================================================
-  // Removemos o parâmetro 'userEmail' que não era mais necessário.
   Future<Map<String, int>> getDeviceUsage() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return {'smartphone': 0, 'desktop': 0};
 
-    // Reutiliza a mesma lógica de busca.
     final clienteDoc = await findLicenseDocumentForUser(user);
     if (clienteDoc == null || !clienteDoc.exists) {
       return {'smartphone': 0, 'desktop': 0};
@@ -125,7 +121,6 @@ class LicensingService {
     return _getDeviceCountFromDoc(clienteDoc.reference);
   }
   
-  // As funções abaixo não precisam de alterações.
   Future<Map<String, int>> _getDeviceCountFromDoc(DocumentReference docRef) async {
     final dispositivosAtivosRef = docRef.collection('dispositivosAtivos');
     final smartphoneCount = (await dispositivosAtivosRef.where('tipo', isEqualTo: 'smartphone').count().get()).count ?? 0;
