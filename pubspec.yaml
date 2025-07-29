@@ -9,19 +9,20 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_app_check: ^0.2.1+18 # Use a versão mais recente
+  firebase_app_check: ^0.4.0 # Use a versão mais recente
+  
 
   # Firebase e Gerenciamento de Estado
-  firebase_core: ^2.27.0
-  firebase_auth: ^4.17.8
-  cloud_firestore: ^4.15.8
+  firebase_core: ^4.0.0
+  firebase_auth: ^6.0.0
+  cloud_firestore: ^6.0.0
   provider: ^6.1.2
   ml_linalg: ^13.12.6
 
   # Mapa e Geometria
-  flutter_map: ^6.1.0
+  flutter_map: ^8.2.1
   latlong2: ^0.9.1
-  geolocator: ^11.1.0
+  geolocator: ^14.0.2
   proj4dart: ^2.1.0
     
   # Banco de Dados Local
@@ -30,30 +31,33 @@ dependencies:
 
   # Utilitários e UI
   cupertino_icons: ^1.0.8
-  intl: ^0.18.1
+  intl: ^0.20.2
   path: ^1.9.0
   path_provider: ^2.1.5
   path_provider_android: ^2.2.4 # <<< DEPENDÊNCIA NECESSÁRIA ADICIONADA
   shared_preferences: ^2.2.2
-  device_info_plus: ^9.1.2
-  permission_handler: ^11.3.1
+  device_info_plus: ^11.5.0
+  permission_handler: ^12.0.1
+  image_gallery_saver: ^1.7.1
   
   # Ferramentas de Arquivos e Compartilhamento
-  file_picker: ^8.0.0+1
-  share_plus: ^8.0.2
+  file_picker: ^10.2.0
+  share_plus: ^11.0.0
   csv: ^6.0.0
   shapefile: ^1.0.1
   pdf: ^3.10.8
-  open_file: ^3.3.2
+  open_file: ^3.5.10
+
+  media_scanner: ^2.1.0
 
   # Widgets de UI
-  flutter_slidable: ^3.1.0
+  flutter_slidable: ^4.0.0
   flutter_speed_dial: ^7.0.0
   url_launcher: ^6.3.2
   connectivity_plus: ^6.1.4
-  flutter_map_line_editor: ^6.0.0
-  flutter_map_dragmarker: ^6.0.0
-  fl_chart: ^0.68.0
+  flutter_map_line_editor: ^8.0.0
+  flutter_map_dragmarker: ^8.0.3
+  fl_chart: ^1.0.0
   flutter_archive: ^6.0.3
   uuid: ^4.3.3 # Ou a versão mais recente
 
@@ -73,8 +77,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.2
-  flutter_launcher_icons: "^0.13.1" # <<< LINHA ADICIONADA (use a versão mais recente)
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4 # <<< LINHA ADICIONADA (use a versão mais recente)
 
 flutter:
   uses-material-design: true

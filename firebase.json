@@ -1,1 +1,35 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"geoforestanalytics-0315","appId":"1:147507206203:android:b997a34d367a45a07e241e","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"geoforestanalytics-0315","configurations":{"android":"1:147507206203:android:b997a34d367a45a07e241e"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "geoforestanalytics-0315",
+          "appId": "1:147507206203:android:b997a34d367a45a07e241e",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "geoforestanalytics-0315",
+          "configurations": {
+            "android": "1:147507206203:android:b997a34d367a45a07e241e"
+          }
+        }
+      }
+    }
+  },
+  "functions": {
+    "source": "functions",
+    "codebase": "default",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "*.local"
+    ],
+ "predeploy": [
+    "npm --prefix \"$RESOURCE_DIR\" run build"
+]
+  }
+}

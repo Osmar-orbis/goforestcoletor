@@ -1,3 +1,5 @@
+// Caminho: android/app/build.gradle.kts (VERSÃO FINAL E CORRIGIDA)
+
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -16,7 +18,7 @@ if (keyPropertiesFile.exists()) {
 
 android {
     namespace = "com.example.geoforestcoletor"
-    compileSdk = 35
+    compileSdk = 35 // Updated from 34 to 35
 
     signingConfigs {
         create("release") {
@@ -32,38 +34,31 @@ android {
     defaultConfig {
         applicationId = "com.example.geoforestcoletor"
         minSdk = 23
-        targetSdk = 35
+        targetSdk = 35 // Updated from 34 to 35
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled = true
     }
 
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+        }
+    }
+
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
 
     sourceSets {
         getByName("main").java.srcDirs("src/main/kotlin")
-    }
-
-    // =======================================================
-    // === SEÇÃO DE BUILD CORRIGIDA PARA PRODUÇÃO ===
-    // =======================================================
-    buildTypes {
-        getByName("release") {
-            // Configuração de assinatura
-            signingConfig = signingConfigs.getByName("release")
-
-            // Habilita a minificação (R8) e a remoção de recursos não utilizados.
-            // Isso é essencial para otimizar o APK de produção.
-            isMinifyEnabled = true
-            isShrinkResources = true
-        }
     }
 }
 

@@ -1,15 +1,20 @@
-// lib/pages/menu/configuracoes_page.dart (VERSÃO COM NAVEGAÇÃO DE LOGOUT CORRIGIDA)
+// lib/pages/menu/configuracoes_page.dart (VERSÃO COM LINK PARA GERENCIAR DELEGAÇÕES)
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geoforestcoletor/controller/login_controller.dart';
 import 'package:geoforestcoletor/pages/menu/login_page.dart';
+import 'package:geoforestcoletor/providers/license_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
 import 'package:geoforestcoletor/services/licensing_service.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+// <<< MUDANÇA 1: Import da nova tela de gerenciamento de delegações >>>
+import 'package:geoforestcoletor/pages/projetos/gerenciar_delegacoes_page.dart';
+
 
 const Map<String, int> zonasUtmSirgas2000 = {
   'SIRGAS 2000 / UTM Zona 18S': 31978, 'SIRGAS 2000 / UTM Zona 19S': 31979,
@@ -114,11 +119,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
       conteudo: 'Tem certeza de que deseja sair da sua conta?',
       isDestructive: false,
       onConfirmar: () async {
-        // <<< CORREÇÃO APLICADA AQUI >>>
-        // Primeiro, executa a lógica de logout no controller
         await context.read<LoginController>().signOut();
-        
-        // Depois, garante uma navegação limpa para a tela de login, removendo todas as outras telas
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -144,6 +145,10 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
 
   @override
   Widget build(BuildContext context) {
+    // <<< MUDANÇA 2: Verificando o cargo do usuário para mostrar o botão condicionalmente >>>
+    final licenseProvider = context.watch<LicenseProvider>();
+    final isGerente = licenseProvider.licenseData?.cargo == 'gerente';
+
     return Scaffold(
       appBar: AppBar(title: const Text('Configurações e Gerenciamento')),
       body: _zonaSelecionada == null
@@ -214,6 +219,21 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
 
                   const Text('Gerenciamento de Dados', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
                   const SizedBox(height: 12),
+                  
+                  // <<< MUDANÇA 3: O novo ListTile/Botão que só aparece para o gerente >>>
+                  if (isGerente)
+                    ListTile(
+                      leading: const Icon(Icons.handshake_outlined, color: Colors.teal),
+                      title: const Text('Gerenciar Delegações'),
+                      subtitle: const Text('Veja o status e gerencie os projetos compartilhados.'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const GerenciarDelegacoesPage()),
+                        );
+                      },
+                    ),
+
                   ListTile(
                     leading: const Icon(Icons.archive_outlined),
                     title: const Text('Arquivar Coletas Exportadas'),

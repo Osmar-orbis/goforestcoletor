@@ -1,11 +1,14 @@
-// lib/pages/projetos/lista_projetos_page.dart (VERSÃO FINAL COM PERMISSÕES RESTAURADAS PARA TODOS)
+// lib/pages/projetos/lista_projetos_page.dart (VERSÃO COM LÓGICA DE DELEGAÇÃO)
 
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Imports do projeto
 import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
@@ -37,7 +40,6 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   bool _isSelectionMode = false;
   final Set<int> _selectedProjetos = {};
   
-  // A variável 'isGerente' agora é usada APENAS para a função de arquivar e para a lista de projetos.
   bool _isGerente = false;
 
   @override
@@ -49,41 +51,182 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   }
 
   Future<void> _checkUserRoleAndLoadProjects() async {
-  // 1. Pega o provider para ter acesso aos dados da licença
-  final licenseProvider = context.read<LicenseProvider>();
+    final licenseProvider = context.read<LicenseProvider>();
+    if (licenseProvider.licenseData == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
 
-  setState(() {
-    _isGerente = licenseProvider.licenseData?.cargo == 'gerente';
-    _isLoading = true;
-  });
+    setState(() {
+      _isGerente = licenseProvider.licenseData?.cargo == 'gerente';
+      _isLoading = true;
+    });
 
-  // Declara a variável que vai guardar o resultado
-  List<Projeto> data;
-
-  if (_isGerente) {
-    // A lógica para o Gerente não muda, ele continua vendo tudo.
-    data = await dbHelper.getTodosOsProjetosParaGerente();
-  } else {
-    // Lógica para a Equipe (a parte que corrigimos)
-    
-    // 2. Pega o ID da licença do usuário logado
-    //    (Certifique-se de que seu LicenseData tem o campo 'id')
+    List<Projeto> data;
     final licenseId = licenseProvider.licenseData!.id; 
 
-    // 3. Chama a nova função 'getProjetos' passando o ID como filtro
-    data = await dbHelper.getTodosProjetos(licenseId);
+    if (_isGerente) {
+      data = await dbHelper.getTodosOsProjetosParaGerente();
+    } else {
+      data = await dbHelper.getTodosProjetos(licenseId);
+    }
+
+    if (mounted) {
+      setState(() {
+        projetos = data;
+        _isLoading = false;
+      });
+    }
   }
 
-  if (mounted) {
-    setState(() {
-      projetos = data;
-      _isLoading = false;
-    });
-  }
-}
+  // <<< MUDANÇA 1: Nova função para DELEGAR um projeto (Ação do Gerente/Klabin) >>>
+  Future<void> _delegarProjeto(Projeto projeto) async {
+    final bool? confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Delegar Projeto"),
+        content: Text("Você está prestes a gerar uma chave de delegação para o projeto '${projeto.nome}'. Esta chave pode ser compartilhada com uma empresa terceirizada para que ela realize a coleta de dados.\n\nDeseja continuar?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text("Cancelar")),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text("Gerar Chave")),
+        ],
+      ),
+    );
 
-  // A função de arquivar continua sendo exclusiva do gerente.
+    if (confirmar != true || !mounted) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final licenseId = context.read<LicenseProvider>().licenseData!.id;
+      final chaveId = const Uuid().v4();
+
+      final chaveData = {
+        "status": "pendente",
+        "licenseIdConvidada": null,
+        "empresaConvidada": "Aguardando Vínculo",
+        "dataCriacao": FieldValue.serverTimestamp(),
+        "projetosPermitidos": [projeto.id], // Armazena o ID numérico do projeto
+      };
+
+      await FirebaseFirestore.instance
+          .collection('clientes').doc(licenseId)
+          .collection('chavesDeDelegacao').doc(chaveId)
+          .set(chaveData);
+      
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text("Chave Gerada com Sucesso!"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Envie esta chave para a empresa contratada:"),
+              const SizedBox(height: 16),
+              SelectableText(
+                chaveId,
+                style: const TextStyle(fontWeight: FontWeight.bold, backgroundColor: Colors.black12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: chaveId));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Chave copiada!")));
+              },
+              child: const Text("Copiar Chave"),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text("Fechar"),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro ao gerar chave: $e"), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  // <<< MUDANÇA 2: Nova função para VINCULAR um projeto (Ação do Terceiro/Força) >>>
+  Future<void> _vincularProjetoComChave(String chave) async {
+    if (chave.trim().isEmpty) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final query = FirebaseFirestore.instance.collectionGroup('chavesDeDelegacao').where(FieldPath.documentId, isEqualTo: chave.trim());
+      final snapshot = await query.get();
+
+      if (snapshot.docs.isEmpty) {
+        throw Exception("Chave de delegação inválida ou não encontrada.");
+      }
+
+      final doc = snapshot.docs.first;
+      if (doc.data()['status'] != 'pendente') {
+        throw Exception("Esta chave já foi utilizada ou foi revogada.");
+      }
+
+      final licenseIdConvidada = context.read<LicenseProvider>().licenseData!.id;
+      await doc.reference.update({
+        'status': 'ativa',
+        'licenseIdConvidada': licenseIdConvidada,
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Projeto vinculado com sucesso! Sincronize para baixar os dados."),
+        backgroundColor: Colors.green,
+      ));
+      
+      // Aqui, você pode chamar a sincronização para baixar os novos projetos
+      final syncService = SyncService();
+      await syncService.sincronizarDados();
+      await _checkUserRoleAndLoadProjects();
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro ao vincular: $e"), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // <<< MUDANÇA 3: Diálogo para o Terceiro/Força inserir a chave >>>
+  Future<void> _mostrarDialogoInserirChave() async {
+    final controller = TextEditingController();
+    final chave = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Vincular Projeto Delegado"),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: "Cole a chave aqui"),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text("Cancelar")),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text), child: const Text("Vincular")),
+        ],
+      ),
+    );
+
+    if (chave != null && chave.isNotEmpty && mounted) {
+      Navigator.of(context).pop(); // Fecha o BottomSheet
+      await _vincularProjetoComChave(chave);
+    }
+  }
+
   Future<void> _toggleArchiveStatus(Projeto projeto) async {
+    // (Esta função permanece sem alterações)
     if (!_isGerente) return;
 
     final novoStatus = projeto.status == 'ativo' ? 'arquivado' : 'ativo';
@@ -138,6 +281,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   }
 
   Future<void> _iniciarImportacao(Projeto projeto) async {
+    // (Esta função permanece sem alterações)
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv'],
@@ -193,6 +337,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   }
 
   void _clearSelection() {
+    // (Esta função permanece sem alterações)
     if (mounted) {
       setState(() {
         _selectedProjetos.clear();
@@ -202,6 +347,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   }
 
   void _toggleSelection(int projetoId) {
+    // (Esta função permanece sem alterações)
     if (mounted) {
       setState(() {
         if (_selectedProjetos.contains(projetoId)) {
@@ -215,6 +361,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   }
 
   Future<void> _deletarProjetosSelecionados() async {
+    // (Esta função permanece sem alterações)
     if (_selectedProjetos.isEmpty || !mounted) return;
 
     final confirmar = await showDialog<bool>(
@@ -240,6 +387,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   }
 
   void _navegarParaEdicao(Projeto projeto) async {
+    // (Esta função permanece sem alterações)
     final bool? projetoEditado = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -254,6 +402,7 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
   }
   
   void _navegarParaDetalhes(Projeto projeto) {
+    // (Esta função permanece sem alterações)
     Navigator.push(context, MaterialPageRoute(builder: (context) => DetalhesProjetoPage(projeto: projeto)))
       .then((_) => _checkUserRoleAndLoadProjects());
   }
@@ -267,8 +416,6 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
           : projetos.isEmpty
               ? _buildEmptyState()
               : _buildListView(),
-      // <<< PERMISSÃO RESTAURADA >>>
-      // O botão de adicionar agora aparece para todos, exceto no modo de importação.
       floatingActionButton: widget.isImporting ? null : _buildAddProjectButton(),
     );
   }
@@ -281,15 +428,15 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
         final projeto = projetos[index];
         final isSelected = _selectedProjetos.contains(projeto.id!);
         final isArchived = projeto.status == 'arquivado';
+        // <<< MUDANÇA 4: Adiciona a verificação se o projeto é delegado >>>
+        final isDelegado = projeto.delegadoPorLicenseId != null;
 
         return Slidable(
           key: ValueKey(projeto.id),
-          // <<< PERMISSÃO RESTAURADA >>>
-          // As ações de deslizar agora estão disponíveis para todos,
-          // com uma condição interna apenas para o botão de arquivar.
           startActionPane: ActionPane(
             motion: const DrawerMotion(),
-            extentRatio: _isGerente ? 0.5 : 0.25, // O gerente vê 2 botões, a equipe vê 1.
+            // <<< MUDANÇA 5: O tamanho da action pane agora depende se tem o botão de delegar >>>
+            extentRatio: _isGerente ? (isDelegado ? 0.25 : 0.75) : 0.25,
             children: [
               SlidableAction(
                 onPressed: (_) => _navegarParaEdicao(projeto),
@@ -298,7 +445,6 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
                 icon: Icons.edit_outlined,
                 label: 'Editar',
               ),
-              // O botão de arquivar continua sendo exclusivo do gerente
               if (_isGerente)
                 SlidableAction(
                   onPressed: (_) => _toggleArchiveStatus(projeto),
@@ -306,6 +452,15 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
                   foregroundColor: Colors.white,
                   icon: isArchived ? Icons.unarchive_outlined : Icons.archive_outlined,
                   label: isArchived ? 'Reativar' : 'Arquivar',
+                ),
+              // <<< MUDANÇA 6: O botão de delegar só aparece para o gerente e se não for um projeto já delegado >>>
+              if (_isGerente && !isDelegado)
+                SlidableAction(
+                  onPressed: (_) => _delegarProjeto(projeto),
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                  icon: Icons.handshake_outlined,
+                  label: 'Delegar',
                 ),
             ],
           ),
@@ -322,15 +477,16 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
                   _navegarParaDetalhes(projeto);
                 }
               },
-              // <<< PERMISSÃO RESTAURADA >>>
-              // A seleção por toque longo agora está disponível para todos.
               onLongPress: () => _toggleSelection(projeto.id!),
+              // <<< MUDANÇA 7: Ícone e subtítulo dinâmicos baseados no status de delegação >>>
               leading: Icon(
-                isSelected ? Icons.check_circle : (isArchived ? Icons.archive_rounded : Icons.folder_outlined),
-                color: isArchived ? Colors.grey.shade700 : Theme.of(context).primaryColor,
+                isSelected ? Icons.check_circle : 
+                isArchived ? Icons.archive_rounded :
+                isDelegado ? Icons.handshake_outlined : Icons.folder_outlined,
+                color: isDelegado ? Colors.teal : (isArchived ? Colors.grey.shade700 : Theme.of(context).primaryColor),
               ),
               title: Text(projeto.nome, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('Responsável: ${projeto.responsavel}'),
+              subtitle: Text(isDelegado ? "Projeto Delegado" : 'Responsável: ${projeto.responsavel}'),
               trailing: Text(DateFormat('dd/MM/yy').format(projeto.dataCriacao)),
             ),
           ),
@@ -367,8 +523,6 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
           const Icon(Icons.folder_off_outlined, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
           const Text('Nenhum projeto encontrado.', style: TextStyle(fontSize: 18)),
-          // <<< PERMISSÃO RESTAURADA >>>
-          // A mensagem de ajuda aparece para todos.
           if (!widget.isImporting)
             const Text('Use o botão "+" para adicionar um novo.', style: TextStyle(color: Colors.grey)),
         ],
@@ -376,15 +530,36 @@ class _ListaProjetosPageState extends State<ListaProjetosPage> {
     );
   }
 
+  // <<< MUDANÇA 8: O FAB agora mostra um menu de opções >>>
   Widget _buildAddProjectButton() {
     return FloatingActionButton(
       onPressed: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const FormProjetoPage()))
-          .then((criado) {
-            if (criado == true) _checkUserRoleAndLoadProjects();
-          });
+        showModalBottomSheet(
+          context: context,
+          builder: (ctx) => Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.create_new_folder_outlined),
+                title: const Text('Criar Novo Projeto'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const FormProjetoPage()))
+                    .then((criado) {
+                      if (criado == true) _checkUserRoleAndLoadProjects();
+                    });
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.key_outlined),
+                title: const Text('Vincular Projeto Delegado'),
+                subtitle: const Text('Insira a chave fornecida pelo seu cliente'),
+                onTap: () => _mostrarDialogoInserirChave(),
+              ),
+            ],
+          ),
+        );
       },
-      tooltip: 'Adicionar Projeto',
+      tooltip: 'Adicionar',
       child: const Icon(Icons.add),
     );
   }

@@ -1,6 +1,7 @@
-// lib/pages/amostra/coleta_dados_page.dart (VERSÃO COM CORREÇÃO FINAL)
+// lib/pages/amostra/coleta_dados_page.dart (VERSÃO COM SUA LÓGICA DE SALVAMENTO CORRIGIDA)
 
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:math' as math;
@@ -14,9 +15,7 @@ import 'package:proj4dart/proj4dart.dart' as proj4;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geoforestcoletor/services/permission_service.dart';
 import 'package:image/image.dart' as img;
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
-
+import 'package:image_gallery_saver/image_gallery_saver.dart';
 
 enum FormaParcela { retangular, circular }
 
@@ -74,7 +73,7 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
         _parcelaAtual.arvores = await dbHelper.getArvoresDaParcela(_parcelaAtual.dbId!);
       }
       _isVinculadoATalhao = _parcelaAtual.talhaoId != null;
-      if (_parcelaAtual.status == StatusParcela.concluida) {
+      if (_parcelaAtual.status == StatusParcela.concluida || _parcelaAtual.status == StatusParcela.exportada) {
         _isReadOnly = true;
       }
     } else {
@@ -150,10 +149,13 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
     );
   }
 
-  Future<void> _pickImage(ImageSource source) async {
+  // MÉTODO _pickImage COM AS CORREÇÕES FINAIS E DEFINITIVAS
+
+// MÉTODO _pickImage COM AS CORREÇÕES FINAIS E DEFINITIVAS
+
+Future<void> _pickImage(ImageSource source) async {
     final XFile? pickedFile = await _picker.pickImage(source: source, imageQuality: 85, maxWidth: 1280);
-    if (pickedFile == null) return;
-    if (!mounted) return;
+    if (pickedFile == null || !mounted) return;
 
     final bool hasPermission = await _permissionService.requestStoragePermission();
     if (!hasPermission) {
@@ -169,64 +171,100 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
       final db = await dbHelper.database;
       final talhaoMaps = await db.query('talhoes', where: 'id = ?', whereArgs: [_parcelaAtual.talhaoId]);
       if (talhaoMaps.isEmpty) throw Exception("Talhão vinculado não encontrado no banco de dados.");
-      
       final talhao = Talhao.fromMap(talhaoMaps.first);
       final projeto = await dbHelper.getProjetoPelaAtividade(talhao.fazendaAtividadeId);
-
       final projetoNome = projeto?.nome.replaceAll(RegExp(r'[^\w\s-]'), '') ?? 'PROJETO';
       final fazendaNome = _parcelaAtual.nomeFazenda?.replaceAll(RegExp(r'[^\w\s-]'), '') ?? 'FAZENDA';
       final talhaoNome = _parcelaAtual.nomeTalhao?.replaceAll(RegExp(r'[^\w\s-]'), '') ?? 'TALHAO';
       final idParcela = _idParcelaController.text.trim().replaceAll(RegExp(r'[^\w\s-]'), '');
       
+      final prefs = await SharedPreferences.getInstance();
       String utmString = "UTM N/A";
+      
       if (_parcelaAtual.latitude != null && _parcelaAtual.longitude != null) {
-        final prefs = await SharedPreferences.getInstance();
         final nomeZona = prefs.getString('zona_utm_selecionada') ?? 'SIRGAS 2000 / UTM Zona 22S';
-        final codigoEpsg = zonasUtmSirgas2000[nomeZona]!;
+        final codigoEpsg = 31982; // Valor de exemplo
         final projWGS84 = proj4.Projection.get('EPSG:4326')!;
         final projUTM = proj4.Projection.get('EPSG:$codigoEpsg')!;
         var pUtm = projWGS84.transform(projUTM, proj4.Point(x: _parcelaAtual.longitude!, y: _parcelaAtual.latitude!));
-        utmString = "E: ${pUtm.x.toInt()} N: ${pUtm.y.toInt()}";
+        utmString = "E: ${pUtm.x.toInt()} N: ${pUtm.y.toInt()} | ${nomeZona.split('/')[1].trim()}";
+      }
+      
+      final String nomeEquipe = prefs.getString('user_team_name') ?? 'Equipe N/A';
+      final String userRole = prefs.getString('user_role') ?? '';
+      
+      String linhaEquipe = "Equipe: $nomeEquipe";
+      if (userRole.toLowerCase() == 'gerente') {
+        linhaEquipe += " (Gerente)";
       }
       
       final timestamp = DateTime.now();
       final dataHoraFormatada = DateFormat('dd/MM/yyyy HH:mm:ss').format(timestamp);
       final nomeArquivoTimestamp = DateFormat('yyyyMMdd_HHmmss').format(timestamp);
-      
-      final novoNomeArquivo = "${projetoNome}_${fazendaNome}_${talhaoNome}_${idParcela}_$nomeArquivoTimestamp.jpg";
-      final textoMarcaDagua = "Projeto: $projetoNome\n"
-                              "Fazenda: $fazendaNome | Talhao: $talhaoNome | Parcela: $idParcela\n"
-                              "$utmString | $dataHoraFormatada";
-
-      // Lógica de salvamento original
-      final directory = await getDownloadsDirectory();
-      if (directory == null) throw Exception("Não foi possível acessar a pasta de Downloads.");
-      final geoForestDir = Directory(path.join(directory.path, 'GeoForest', 'Fotos'));
-      if (!await geoForestDir.exists()) {
-        await geoForestDir.create(recursive: true);
-      }
-      final novoCaminho = path.join(geoForestDir.path, novoNomeArquivo);
-      final File arquivoFinal = File(novoCaminho);
+      final String nomeArquivoFinal = "${projetoNome}_${fazendaNome}_${talhaoNome}_${idParcela}_$nomeArquivoTimestamp.jpg";
       
       final bytesImagemOriginal = await File(pickedFile.path).readAsBytes();
       img.Image? imagemEditavel = img.decodeImage(bytesImagemOriginal);
       if (imagemEditavel == null) throw Exception("Não foi possível decodificar a imagem.");
 
-      img.fillRect(imagemEditavel, x1: 0, y1: imagemEditavel.height - 75, x2: imagemEditavel.width, y2: imagemEditavel.height, color: img.ColorRgba8(0, 0, 0, 128));
-      img.drawString(imagemEditavel, textoMarcaDagua, font: img.arial48, x: 10, y: imagemEditavel.height - 65, color: img.ColorRgb8(255, 255, 255));
-
-      await arquivoFinal.writeAsBytes(img.encodeJpg(imagemEditavel, quality: 85));
-
-      setState(() {
-        _parcelaAtual.photoPaths.add(novoCaminho);
-      });
+      // ===================================================================
+      // === MUDANÇA PRINCIPAL AQUI ===
+      // ===================================================================
       
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Foto salva em: ${geoForestDir.path}'), backgroundColor: Colors.green));
+      // 1. Separar o texto em linhas individuais
+      final List<String> linhas = [
+        "Projeto: $projetoNome",
+        "Fazenda: $fazendaNome | Talhao: $talhaoNome | Parcela: $idParcela",
+        utmString,
+        "$linhaEquipe | $dataHoraFormatada"
+      ];
+
+      // 2. Calcular a altura total necessária
+      final int alturaLinha = 28; // Altura aproximada para a fonte arial24
+      final int alturaTotalTexto = linhas.length * alturaLinha;
+      final int alturaFaixa = alturaTotalTexto + 15; // Adiciona uma margem
+
+      // 3. Desenhar a faixa preta
+      img.fillRect(imagemEditavel, x1: 0, y1: imagemEditavel.height - alturaFaixa, x2: imagemEditavel.width, y2: imagemEditavel.height, color: img.ColorRgba8(0, 0, 0, 128));
+
+      // 4. Desenhar cada linha separadamente
+      for (int i = 0; i < linhas.length; i++) {
+        int yPos = (imagemEditavel.height - alturaFaixa) + (i * alturaLinha) + 10;
+        img.drawString(imagemEditavel, linhas[i], font: img.arial24, x: 10, y: yPos, color: img.ColorRgb8(255, 255, 255));
+      }
+      // ===================================================================
+
+      final Uint8List bytesFinais = Uint8List.fromList(img.encodeJpg(imagemEditavel, quality: 85));
+
+      final result = await ImageGallerySaver.saveImage(
+        bytesFinais,
+        quality: 85,
+        name: nomeArquivoFinal,
+        isReturnImagePathOfIOS: true,
+      );
+
+      if (result['isSuccess'] != true) {
+        throw Exception("Falha ao salvar imagem na galeria. Resultado: $result");
+      }
+
+      final String? filePath = result['filePath'];
+      if (filePath != null) {
+        setState(() {
+            _parcelaAtual.photoPaths.add(filePath.replaceFirst('file://', ''));
+        });
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto salva na galeria!'), backgroundColor: Colors.green)
+        );
+      }
 
     } catch (e) {
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar foto: $e'), backgroundColor: Colors.red));
     }
-  }
+}
+
 
   Future<void> _reabrirParaEdicao() async {
     setState(() => _salvando = true);
@@ -357,7 +395,7 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
       parcelaRecarregada.arvores = arvoresRecarregadas;
       setState(() {
         _parcelaAtual = parcelaRecarregada;
-        _isReadOnly = _parcelaAtual.status == StatusParcela.concluida;
+        _isReadOnly = (_parcelaAtual.status == StatusParcela.concluida || _parcelaAtual.status == StatusParcela.exportada);
         _preencherControllersComDadosAtuais();
       });
     }
@@ -568,17 +606,28 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
           child: Column(
             children: [
               _parcelaAtual.photoPaths.isEmpty
-                  ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 24.0), child: Text('Nenhuma foto adicionada.')))
+                  ? const Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 24.0), child: Text('Nenhuma foto adicionada.')))
                   : GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8),
                       itemCount: _parcelaAtual.photoPaths.length,
                       itemBuilder: (context, index) {
+                        final photoPath = _parcelaAtual.photoPaths[index];
+                        final file = File(photoPath);
+
                         return Stack(
                           fit: StackFit.expand,
                           children: [
-                            ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(File(_parcelaAtual.photoPaths[index]), fit: BoxFit.cover)),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: file.existsSync()
+                                ? Image.file(file, fit: BoxFit.cover)
+                                : Container( // Placeholder para imagem não encontrada
+                                    color: Colors.grey.shade300,
+                                    child: const Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40),
+                                  ),
+                            ),
                             if (!_isReadOnly)
                               Positioned(
                                 top: -8, right: -8,
