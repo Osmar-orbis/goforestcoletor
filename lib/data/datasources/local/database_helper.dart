@@ -1,4 +1,4 @@
-// lib/data/datasources/local/database_helper.dart (VERSÃO 100% COMPLETA E CORRIGIDA)
+// lib/data/datasources/local/database_helper.dart (VERSÃO FINAL COM DELEGAÇÃO)
 
 import 'dart:convert';
 import 'package:csv/csv.dart';
@@ -59,7 +59,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       join(await getDatabasesPath(), 'geoforestcoletor.db'),
-      version: 29,
+      version: 30,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -72,12 +72,13 @@ class DatabaseHelper {
      await db.execute('''
       CREATE TABLE projetos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        licenseId TEXT NOT NULL,
+        licenseId TEXT,
         nome TEXT NOT NULL,
         empresa TEXT NOT NULL,
         responsavel TEXT NOT NULL,
         dataCriacao TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'ativo'
+        status TEXT NOT NULL DEFAULT 'ativo',
+        delegado_por_license_id TEXT
       )
     ''');
     await db.execute('''
@@ -223,7 +224,10 @@ class DatabaseHelper {
           await db.execute("ALTER TABLE parcelas ADD COLUMN projetoId INTEGER");
           break;
         case 29:
-          (await db.execute("ALTER TABLE projetos ADD COLUMN licenseId TEXT"));
+          await db.execute("ALTER TABLE projetos ADD COLUMN licenseId TEXT");
+          break;
+        case 30:
+          await db.execute("ALTER TABLE projetos ADD COLUMN delegado_por_license_id TEXT");
           break;
       }
     }
@@ -849,8 +853,38 @@ class DatabaseHelper {
     final maps = await db.query('cubagens_arvores');
     return List.generate(maps.length, (i) => CubagemArvore.fromMap(maps[i]));
   }
+
+
   Future<void> markCubagemAsSynced(int id) async {
     final db = await database;
     await db.update('cubagens_arvores', {'isSynced': 1}, where: 'id = ?', whereArgs: [id]);
+  }
+
+    Future<Projeto?> getProjetoPelaCubagem(CubagemArvore cubagem) async {
+    if (cubagem.talhaoId == null) return null;
+    final db = await database;
+    final maps = await db.rawQuery('''
+      SELECT P.* FROM projetos P
+      JOIN atividades A ON P.id = A.projetoId
+      JOIN fazendas F ON A.id = F.atividadeId
+      JOIN talhoes T ON F.id = T.fazendaId AND F.atividadeId = T.fazendaAtividadeId
+      WHERE T.id = ?
+    ''', [cubagem.talhaoId]);
+    if (maps.isNotEmpty) return Projeto.fromMap(maps.first);
+    return null;
+  }
+
+  Future<Projeto?> getProjetoPelaParcela(Parcela parcela) async {
+    if (parcela.talhaoId == null) return null;
+    final db = await database;
+    final maps = await db.rawQuery('''
+      SELECT P.* FROM projetos P
+      JOIN atividades A ON P.id = A.projetoId
+      JOIN fazendas F ON A.id = F.atividadeId
+      JOIN talhoes T ON F.id = T.fazendaId AND F.atividadeId = T.fazendaAtividadeId
+      WHERE T.id = ?
+    ''', [parcela.talhaoId]);
+    if (maps.isNotEmpty) return Projeto.fromMap(maps.first);
+    return null;
   }
 }

@@ -15,7 +15,11 @@ import 'package:proj4dart/proj4dart.dart' as proj4;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geoforestcoletor/services/permission_service.dart';
 import 'package:image/image.dart' as img;
+<<<<<<< HEAD
 import 'package:image_gallery_saver/image_gallery_saver.dart';
+=======
+import 'package:gal/gal.dart';
+>>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
 
 enum FormaParcela { retangular, circular }
 
@@ -207,6 +211,7 @@ Future<void> _pickImage(ImageSource source) async {
       img.Image? imagemEditavel = img.decodeImage(bytesImagemOriginal);
       if (imagemEditavel == null) throw Exception("Não foi possível decodificar a imagem.");
 
+<<<<<<< HEAD
       // ===================================================================
       // === MUDANÇA PRINCIPAL AQUI ===
       // ===================================================================
@@ -253,6 +258,41 @@ Future<void> _pickImage(ImageSource source) async {
             _parcelaAtual.photoPaths.add(filePath.replaceFirst('file://', ''));
         });
       }
+=======
+      final List<String> linhas = [
+        "Projeto: $projetoNome",
+        "Fazenda: $fazendaNome | Talhao: $talhaoNome | Parcela: $idParcela",
+        utmString,
+        "$linhaEquipe | $dataHoraFormatada"
+      ];
+
+      final int alturaLinha = 28;
+      final int alturaTotalTexto = linhas.length * alturaLinha;
+      final int alturaFaixa = alturaTotalTexto + 15;
+
+      img.fillRect(imagemEditavel, x1: 0, y1: imagemEditavel.height - alturaFaixa, x2: imagemEditavel.width, y2: imagemEditavel.height, color: img.ColorRgba8(0, 0, 0, 128));
+
+      for (int i = 0; i < linhas.length; i++) {
+        int yPos = (imagemEditavel.height - alturaFaixa) + (i * alturaLinha) + 10;
+        img.drawString(imagemEditavel, linhas[i], font: img.arial24, x: 10, y: yPos, color: img.ColorRgb8(255, 255, 255));
+      }
+
+      final Uint8List bytesFinais = Uint8List.fromList(img.encodeJpg(imagemEditavel, quality: 85));
+
+      // ===================================================================
+      // === SUBSTITUIÇÃO DO CÓDIGO ANTIGO PELO NOVO AQUI ===
+      // ===================================================================
+      
+      // Salva a imagem na galeria usando o novo pacote 'gal'
+      await Gal.putImageBytes(bytesFinais, name: nomeArquivoFinal);
+
+      // Adiciona o caminho do arquivo temporário à lista para exibição na tela
+      setState(() {
+          _parcelaAtual.photoPaths.add(pickedFile.path);
+      });
+      
+      // ===================================================================
+>>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -264,7 +304,10 @@ Future<void> _pickImage(ImageSource source) async {
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar foto: $e'), backgroundColor: Colors.red));
     }
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
 
   Future<void> _reabrirParaEdicao() async {
     setState(() => _salvando = true);

@@ -209,17 +209,26 @@ class _DashboardPageState extends State<DashboardPage> {
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
+              reservedSize: 30,
+              // =======================================================
+              // === CORREÇÃO APLICADA AQUI ===
+              // =======================================================
               getTitlesWidget: (double value, TitleMeta meta) {
-                return SideTitleWidget(
-                  axisSide: meta.axisSide,
-                  space: 4,
+                // Garante que o índice está dentro dos limites da lista
+                if (value.toInt() >= entries.length) return const SizedBox.shrink();
+                
+                final String text = entries[value.toInt()].key;
+                
+                // Retorna diretamente o widget de texto
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
                   child: Text(
-                    entries[value.toInt()].key,
+                    text,
                     style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                   ),
                 );
               },
-              reservedSize: 30,
+              // =======================================================
             ),
           ),
           leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -309,16 +318,19 @@ class _DashboardPageState extends State<DashboardPage> {
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
+              reservedSize: 30,
+              // =======================================================
+              // === CORREÇÃO APLICADA AQUI ===
+              // =======================================================
               getTitlesWidget: (double value, TitleMeta meta) {
                 if (value.toInt() >= binStarts.length) return const SizedBox.shrink();
                 final String text = binStarts[value.toInt()].toStringAsFixed(0);
-                return SideTitleWidget(
-                  axisSide: meta.axisSide,
-                  space: 4,
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
                   child: Text(text, style: const TextStyle(fontSize: 10)),
                 );
               },
-              reservedSize: 30,
+              // =======================================================
             ),
           ),
           leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),

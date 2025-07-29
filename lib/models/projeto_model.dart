@@ -1,4 +1,4 @@
-// lib/models/projeto_model.dart
+// lib/models/projeto_model.dart (VERSÃO COM CAMPO DE DELEGAÇÃO)
 
 class Projeto {
   final String? licenseId;
@@ -7,7 +7,9 @@ class Projeto {
   final String empresa;
   final String responsavel;
   final DateTime dataCriacao;
-  final String status; // <<< ADICIONADO
+  final String status;
+  // <<< MUDANÇA 1: Adicionado o novo campo para rastrear a delegação >>>
+  final String? delegadoPorLicenseId;
 
   Projeto({
     this.id,
@@ -16,7 +18,9 @@ class Projeto {
     required this.empresa,
     required this.responsavel,
     required this.dataCriacao,
-    this.status = 'ativo', // <<< ADICIONADO (com valor padrão)
+    this.status = 'ativo',
+    // <<< MUDANÇA 2: Adicionado ao construtor >>>
+    this.delegadoPorLicenseId,
   });
 
   Projeto copyWith({
@@ -26,7 +30,9 @@ class Projeto {
     String? empresa,
     String? responsavel,
     DateTime? dataCriacao,
-    String? status, // <<< ADICIONADO
+    String? status,
+    // <<< MUDANÇA 3: Adicionado ao método copyWith >>>
+    String? delegadoPorLicenseId,
   }) {
     return Projeto(
       id: id ?? this.id,
@@ -35,7 +41,9 @@ class Projeto {
       empresa: empresa ?? this.empresa,
       responsavel: responsavel ?? this.responsavel,
       dataCriacao: dataCriacao ?? this.dataCriacao,
-      status: status ?? this.status, // <<< ADICIONADO
+      status: status ?? this.status,
+      // <<< MUDANÇA 4: Adicionado aqui >>>
+      delegadoPorLicenseId: delegadoPorLicenseId ?? this.delegadoPorLicenseId,
     );
   }
 
@@ -47,7 +55,9 @@ class Projeto {
       'empresa': empresa,
       'responsavel': responsavel,
       'dataCriacao': dataCriacao.toIso8601String(),
-      'status': status, // <<< ADICIONADO
+      'status': status,
+      // <<< MUDANÇA 5: Adicionado ao mapa para salvar no banco de dados >>>
+      'delegado_por_license_id': delegadoPorLicenseId,
     };
   }
 
@@ -59,7 +69,9 @@ class Projeto {
       empresa: map['empresa'],
       responsavel: map['responsavel'],
       dataCriacao: DateTime.parse(map['dataCriacao']),
-      status: map['status'] ?? 'ativo', // <<< ADICIONADO
+      status: map['status'] ?? 'ativo',
+      // <<< MUDANÇA 6: Lendo o novo campo do banco de dados >>>
+      delegadoPorLicenseId: map['delegado_por_license_id'],
     );
   }
 }

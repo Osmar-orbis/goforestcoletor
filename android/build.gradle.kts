@@ -1,11 +1,15 @@
+<<<<<<< HEAD
 // Caminho: android/build.gradle.kts (VERSÃO FINAL E CORRIGIDA)
 
+=======
+>>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
 buildscript {
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
+<<<<<<< HEAD
         // =================================================================
         // === A ÚNICA MUDANÇA NECESSÁRIA ESTÁ AQUI ===
         // Atualizamos a versão do Android Gradle Plugin para 8.2.2, que corrige o bug.
@@ -15,6 +19,11 @@ buildscript {
         // O resto permanece exatamente como estava.
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10")
         classpath("com.google.gms:google-services:4.4.1")
+=======
+        classpath("com.android.tools.build:gradle:7.3.1")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.22")
+        classpath("com.google.gms:google-services:4.4.2")
+>>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
     }
 }
 
@@ -23,6 +32,7 @@ allprojects {
         google()
         mavenCentral()
     }
+<<<<<<< HEAD
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         kotlinOptions {
             jvmTarget = "17"
@@ -87,3 +97,6 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.buildDir)
 }
+=======
+}
+>>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1

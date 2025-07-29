@@ -250,7 +250,7 @@ class GerenteDashboardPage extends StatelessWidget {
     ),
   );
 }
-  Widget _buildBarChartWithTrendLineCard(BuildContext context, Map<String, int> data) {
+   Widget _buildBarChartWithTrendLineCard(BuildContext context, Map<String, int> data) {
     final entries = data.entries.toList();
     final barGroups = entries.asMap().entries.map((entry) {
       return BarChartGroupData(
@@ -277,10 +277,28 @@ class GerenteDashboardPage extends StatelessWidget {
                   titlesData: FlTitlesData(
                     topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (value, meta) {
-                      if (value.toInt() >= entries.length) return const SizedBox.shrink();
-                      return SideTitleWidget(axisSide: meta.axisSide, child: Text(entries[value.toInt()].key, style: const TextStyle(fontSize: 10)));
-                    })),
+                    // =======================================================
+                    // === CORREÇÃO APLICADA AQUI ===
+                    // =======================================================
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 22, // Adiciona um espaço reservado para os títulos
+                        getTitlesWidget: (double value, TitleMeta meta) {
+                          // Garante que o índice está dentro dos limites da lista
+                          if (value.toInt() >= entries.length) return const SizedBox.shrink();
+                          
+                          final String text = entries[value.toInt()].key;
+                          
+                          // Retorna diretamente o widget de texto, sem o SideTitleWidget
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(text, style: const TextStyle(fontSize: 10)),
+                          );
+                        },
+                      ),
+                    ),
+                    // =======================================================
                   ),
                   extraLinesData: ExtraLinesData(
                     horizontalLines: [

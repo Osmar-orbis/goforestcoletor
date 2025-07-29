@@ -139,7 +139,8 @@ class MapProvider with ChangeNotifier {
         return await db.transaction((txn) async {
           final idFazenda = codigoFazenda.isNotEmpty ? codigoFazenda : nomeFazenda;
   
-          Fazenda? fazenda = (await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [idFazenda, _currentAtividade!.id!])).map((e) => Fazenda.fromMap(e)).firstOrNull;
+          final fazendaList = (await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [idFazenda, _currentAtividade!.id!])).map((e) => Fazenda.fromMap(e)).toList();
+          Fazenda? fazenda = fazendaList.isNotEmpty ? fazendaList.first : null;
           if (fazenda == null) {
             fazenda = Fazenda(id: idFazenda, atividadeId: _currentAtividade!.id!, nome: nomeFazenda, municipio: 'N/I', estado: 'N/I');
             await txn.insert('fazendas', fazenda.toMap());
@@ -156,7 +157,13 @@ class MapProvider with ChangeNotifier {
       });
   
       final newFeature = ImportedPolygonFeature(
-        polygon: Polygon(points: List.from(_drawnPoints), color: const Color(0xFF617359).withAlpha(128), borderColor: const Color(0xFF1D4433), borderStrokeWidth: 2, isFilled: true),
+        polygon: Polygon(
+          points: List.from(_drawnPoints), 
+          color: const Color(0xFF617359).withAlpha(128), 
+          borderColor: const Color(0xFF1D4333), 
+          borderStrokeWidth: 2, 
+          // isFilled: true, // <<< ESTA LINHA FOI REMOVIDA
+        ),
         properties: {
           'db_talhao_id': talhaoSalvo.id,
           'db_fazenda_nome': talhaoSalvo.fazendaNome,
@@ -229,16 +236,27 @@ class MapProvider with ChangeNotifier {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            TextButton(onPressed: () {
+              nomeFazendaController.dispose();
+              codigoFazendaController.dispose();
+              nomeTalhaoController.dispose();
+              hectaresController.dispose();
+              Navigator.pop(context);
+            }, child: const Text('Cancelar')),
             ElevatedButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) {
-                  Navigator.pop(context, {
+                  final result = {
                     'nomeFazenda': nomeFazendaController.text.trim(),
                     'codigoFazenda': codigoFazendaController.text.trim(),
                     'nomeTalhao': nomeTalhaoController.text.trim(),
                     'hectares': hectaresController.text.replaceAll(',', '.'),
-                  });
+                  };
+                  nomeFazendaController.dispose();
+                  codigoFazendaController.dispose();
+                  nomeTalhaoController.dispose();
+                  hectaresController.dispose();
+                  Navigator.pop(context, result);
                 }
               },
               child: const Text('Gerar'),
@@ -377,14 +395,16 @@ class MapProvider with ChangeNotifier {
         
         if (fazendaId == null || nomeTalhao == null) continue;
 
-        Fazenda? fazenda = (await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [fazendaId, _currentAtividade!.id!])).map((e) => Fazenda.fromMap(e)).firstOrNull;
+        final fazendaList = (await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [fazendaId, _currentAtividade!.id!])).map((e) => Fazenda.fromMap(e)).toList();
+        Fazenda? fazenda = fazendaList.isNotEmpty ? fazendaList.first : null;
         if (fazenda == null) {
           fazenda = Fazenda(id: fazendaId, atividadeId: _currentAtividade!.id!, nome: props['fazenda_nome']?.toString() ?? fazendaId, municipio: 'N/I', estado: 'N/I');
           await txn.insert('fazendas', fazenda.toMap());
           fazendasCriadas++;
         }
         
-        Talhao? talhao = (await txn.query('talhoes', where: 'nome = ? AND fazendaId = ? AND fazendaAtividadeId = ?', whereArgs: [nomeTalhao, fazenda.id, fazenda.atividadeId])).map((e) => Talhao.fromMap(e)).firstOrNull;
+        final talhaoList = (await txn.query('talhoes', where: 'nome = ? AND fazendaId = ? AND fazendaAtividadeId = ?', whereArgs: [nomeTalhao, fazenda.id, fazenda.atividadeId])).map((e) => Talhao.fromMap(e)).toList();
+        Talhao? talhao = talhaoList.isNotEmpty ? talhaoList.first : null;
         if (talhao == null) {
           talhao = Talhao(
             fazendaId: fazenda.id, fazendaAtividadeId: fazenda.atividadeId, nome: nomeTalhao,
@@ -423,14 +443,16 @@ class MapProvider with ChangeNotifier {
         
         if (fazendaId == null || nomeTalhao == null) continue;
 
-        Fazenda? fazenda = (await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [fazendaId, _currentAtividade!.id!])).map((e) => Fazenda.fromMap(e)).firstOrNull;
+        final fazendaList = (await txn.query('fazendas', where: 'id = ? AND atividadeId = ?', whereArgs: [fazendaId, _currentAtividade!.id!])).map((e) => Fazenda.fromMap(e)).toList();
+        Fazenda? fazenda = fazendaList.isNotEmpty ? fazendaList.first : null;
         if (fazenda == null) {
           fazenda = Fazenda(id: fazendaId, atividadeId: _currentAtividade!.id!, nome: props['fazenda']?.toString() ?? fazendaId, municipio: 'N/I', estado: 'N/I');
           await txn.insert('fazendas', fazenda.toMap());
           novasFazendas++;
         }
 
-        Talhao? talhao = (await txn.query('talhoes', where: 'nome = ? AND fazendaId = ? AND fazendaAtividadeId = ?', whereArgs: [nomeTalhao, fazenda.id, fazenda.atividadeId])).map((e) => Talhao.fromMap(e)).firstOrNull;
+        final talhaoList = (await txn.query('talhoes', where: 'nome = ? AND fazendaId = ? AND fazendaAtividadeId = ?', whereArgs: [nomeTalhao, fazenda.id, fazenda.atividadeId])).map((e) => Talhao.fromMap(e)).toList();
+        Talhao? talhao = talhaoList.isNotEmpty ? talhaoList.first : null;
         if (talhao == null) {
           talhao = Talhao(
             fazendaId: fazenda.id, fazendaAtividadeId: fazenda.atividadeId, nome: nomeTalhao,
