@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-// lib/services/sync_service.dart (VERSÃO COM SINCRONIZAÇÃO CORRIGIDA PARA GERENTE)
-=======
 // lib/services/sync_service.dart (VERSÃO FINAL COM LÓGICA DE DELEGAÇÃO COMPLETA)
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
 
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,7 +8,6 @@ import 'package:geoforestcoletor/models/arvore_model.dart';
 import 'package:geoforestcoletor/models/cubagem_arvore_model.dart';
 import 'package:geoforestcoletor/models/cubagem_secao_model.dart';
 import 'package:geoforestcoletor/models/parcela_model.dart';
-import 'package:geoforestcoletor/models/projeto_model.dart';
 import 'package:geoforestcoletor/services/licensing_service.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,25 +32,12 @@ class SyncService {
     final usuariosPermitidos = licenseData['usuariosPermitidos'] as Map<String, dynamic>? ?? {};
     final cargo = usuariosPermitidos[user.uid] as String? ?? 'equipe';
 
-<<<<<<< HEAD
-    // ===================================================================
-    // ====================== INÍCIO DA ALTERAÇÃO ========================
-    // ===================================================================
-    if (cargo == 'gerente') {
-      debugPrint("Sincronização em modo GERENTE: Upload e Download completos.");
-      // 1. Envia as modificações locais para a nuvem.
-      await _uploadHierarquiaCompleta(licenseId);
-      await _uploadColetasNaoSincronizadas(licenseId);
-      // 2. Baixa as atualizações da nuvem para o dispositivo local.
-      await _downloadHierarquiaCompleta(licenseId);
-=======
     if (cargo == 'gerente') {
       debugPrint("Sincronização em modo GERENTE: Upload e Download completos.");
       await _uploadHierarquiaCompleta(licenseId);
       await _uploadColetasNaoSincronizadas(licenseId);
       await _downloadHierarquiaCompleta(licenseId);
       await _downloadProjetosDelegados(licenseId);
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
       await _downloadColetas(licenseId);
     } else {
       debugPrint("Sincronização em modo EQUIPE: Upload de coletas e Download geral.");
@@ -64,9 +46,6 @@ class SyncService {
       await _downloadProjetosDelegados(licenseId);
       await _downloadColetas(licenseId);
     }
-    // ===================================================================
-    // ======================= FIM DA ALTERAÇÃO ==========================
-    // ===================================================================
   }
 
   /// Envia a estrutura completa dos projetos PRÓPRIOS para a nuvem.
@@ -186,10 +165,7 @@ class SyncService {
     }
   }
   
-<<<<<<< HEAD
-=======
   /// Baixa a hierarquia da PRÓPRIA licença.
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
   Future<void> _downloadHierarquiaCompleta(String licenseId) async {
     final db = await _dbHelper.database;
     
@@ -282,7 +258,6 @@ class SyncService {
     }
     if (fazendaIds.isEmpty) return;
 
-    // A linha "placeholders" foi removida daqui
     final talhoesSnap = await _firestore.collection('clientes').doc(licenseIdDoCliente)
         .collection('talhoes').where('fazendaId', whereIn: fazendaIds).get();
 
@@ -319,23 +294,13 @@ class SyncService {
           pMap['isSynced'] = 1;
           
           if (parcelaLocalResult.isEmpty) {
-<<<<<<< HEAD
-            // Se não existe localmente, insere
-=======
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
             pMap.remove('id');
             final novoIdParcelaLocal = await txn.insert('parcelas', pMap);
             await _sincronizarArvores(txn, docSnapshot, novoIdParcelaLocal);
             novasParcelas++;
           } else {
-<<<<<<< HEAD
-            // Se já existe, atualiza
-            final parcelaLocal = Parcela.fromMap(parcelaLocalResult.first);
-            pMap['id'] = parcelaLocal.dbId; // Garante que estamos atualizando o registro certo
-=======
             final parcelaLocal = Parcela.fromMap(parcelaLocalResult.first);
             pMap['id'] = parcelaLocal.dbId;
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
             await txn.update('parcelas', pMap, where: 'id = ?', whereArgs: [parcelaLocal.dbId]);
             await txn.delete('arvores', where: 'parcelaId = ?', whereArgs: [parcelaLocal.dbId]);
             await _sincronizarArvores(txn, docSnapshot, parcelaLocal.dbId!);
@@ -350,10 +315,6 @@ class SyncService {
     if (parcelasAtualizadas > 0) debugPrint("$parcelasAtualizadas parcelas existentes foram atualizadas.");
   }
   
-<<<<<<< HEAD
-  // Função auxiliar para evitar repetição de código
-=======
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
   Future<void> _sincronizarArvores(DatabaseExecutor txn, firestore.DocumentSnapshot docSnapshot, int idParcelaLocal) async {
       final arvoresSnapshot = await docSnapshot.reference.collection('arvores').get();
       if (arvoresSnapshot.docs.isNotEmpty) {
@@ -412,7 +373,7 @@ class SyncService {
     if (user == null) throw Exception("Usuário não está logado.");
 
     final licenseDoc = await _licensingService.findLicenseDocumentForUser(user);
-    if (licenseDoc == null) throw Exception("Não foi possível encontrar a licença para atualizar o projeto.");
+    if (licenseDoc == null) throw Exception("Não foi possível encontrar la licença para atualizar o projeto.");
     
     final licenseId = licenseDoc.id;
     final projetoRef = _firestore.collection('clientes').doc(licenseId).collection('projetos').doc(projetoId);

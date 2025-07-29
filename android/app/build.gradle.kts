@@ -1,4 +1,4 @@
-// Caminho: android/app/build.gradle.kts (VERSÃO FINAL COM A ÚNICA MUDANÇA NECESSÁRIA)
+// Caminho: android/app/build.gradle.kts (VERSÃO FINAL CORRIGIDA)
 
 import java.util.Properties
 import java.io.FileInputStream
@@ -18,7 +18,8 @@ if (keyPropertiesFile.exists()) {
 
 android {
     namespace = "com.example.geoforestcoletor"
-    compileSdk = 35 // Revert compileSdk to 35 for AGP 8.3.0 compatibility
+    // Usar a versão 34 é o padrão estável atual do Flutter.
+    compileSdk = 34
 
     signingConfigs {
         create("release") {
@@ -34,7 +35,7 @@ android {
     defaultConfig {
         applicationId = "com.example.geoforestcoletor"
         minSdk = 23
-        targetSdk = 35 // Revert targetSdk to 35
+        targetSdk = 34 // Alinhado com o compileSdk
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled = true
@@ -48,10 +49,7 @@ android {
         }
     }
 
-<<<<<<< HEAD
-    // ===================================================================
-    // === ESTA É A ÚNICA MUDANÇA REALMENTE NECESSÁRIA ===
-    // ===================================================================
+    // A versão correta e moderna para compatibilidade com o Gradle 8+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -60,17 +58,6 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-    // ===================================================================
-=======
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
 
     sourceSets {
         getByName("main").java.srcDirs("src/main/kotlin")
@@ -87,13 +74,12 @@ repositories {
 }
 
 dependencies {
-    implementation(kotlin("stdlib-jdk7"))
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation(kotlin("stdlib-jdk8")) // Usar jdk8 aqui é o padrão para compatibilidade
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0")) // BOM atualizado
     implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-perf-ktx")
-    // Use a linha abaixo SOMENTE se realmente precisar do app-check-playintegrity!
-    // implementation("com.google.firebase:firebase-app-check-playintegrity:16.1.2")
+    implementation("com.google.firebase:firebase-app-check-play-integrity") // Sintaxe atualizada
     implementation("androidx.multidex:multidex:2.0.1")
 }

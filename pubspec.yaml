@@ -9,11 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-<<<<<<< HEAD
-  firebase_app_check: ^0.2.1+18 # Use a versão mais recente
+
   
-=======
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
 
   # Firebase e Gerenciamento de Estado (VERSÕES ATUALIZADAS)
   firebase_core: ^4.0.0
@@ -49,11 +46,11 @@ dependencies:
   share_plus: ^11.0.0
   csv: ^6.0.0
   pdf: ^3.10.8
-<<<<<<< HEAD
-  open_file: ^3.3.2
-=======
+
+  
+
   open_file: ^3.5.10
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
+
   media_scanner: ^2.1.0
 
   # Widgets de UI
@@ -67,15 +64,9 @@ dependencies:
   flutter_archive: ^6.0.3
   uuid: ^4.3.3
 
-  # Fotos
-  image_picker: ^1.0.7
-  image: ^4.5.4
-<<<<<<< HEAD
-  image_gallery_saver: ^2.0.3
   
  
-=======
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
+
 
   # Vitrines
   # flutter_stripe: ^10.1.1 # Verifique a versão mais recente no pub.dev

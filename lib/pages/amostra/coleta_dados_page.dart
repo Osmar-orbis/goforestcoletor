@@ -1,7 +1,5 @@
-// lib/pages/amostra/coleta_dados_page.dart (VERSÃO COM SUA LÓGICA DE SALVAMENTO CORRIGIDA)
+// lib/pages/amostra/coleta_dados_page.dart (VERSÃO SEM A FUNCIONALIDADE DE FOTOS)
 
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:math' as math;
@@ -9,17 +7,6 @@ import 'package:geoforestcoletor/models/parcela_model.dart';
 import 'package:geoforestcoletor/models/talhao_model.dart';
 import 'package:geoforestcoletor/pages/amostra/inventario_page.dart';
 import 'package:geoforestcoletor/data/datasources/local/database_helper.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'package:proj4dart/proj4dart.dart' as proj4;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:geoforestcoletor/services/permission_service.dart';
-import 'package:image/image.dart' as img;
-<<<<<<< HEAD
-import 'package:image_gallery_saver/image_gallery_saver.dart';
-=======
-import 'package:gal/gal.dart';
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
 
 enum FormaParcela { retangular, circular }
 
@@ -53,12 +40,9 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
   String? _erroLocalizacao;
   bool _salvando = false;
   FormaParcela _formaDaParcela = FormaParcela.retangular;
-  
+
   bool _isModoEdicao = false;
   bool _isVinculadoATalhao = false;
-
-  final ImagePicker _picker = ImagePicker();
-  final PermissionService _permissionService = PermissionService();
   bool _isReadOnly = false;
 
   @override
@@ -66,14 +50,14 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
     super.initState();
     _setupInitialData();
   }
-  
+
   Future<void> _setupInitialData() async {
     setState(() { _salvando = true; });
     if (widget.parcelaParaEditar != null) {
       _isModoEdicao = true;
       final parcelaDoBanco = await dbHelper.getParcelaById(widget.parcelaParaEditar!.dbId!);
       _parcelaAtual = parcelaDoBanco ?? widget.parcelaParaEditar!;
-      if(parcelaDoBanco != null) {
+      if (parcelaDoBanco != null) {
         _parcelaAtual.arvores = await dbHelper.getArvoresDaParcela(_parcelaAtual.dbId!);
       }
       _isVinculadoATalhao = _parcelaAtual.talhaoId != null;
@@ -125,20 +109,20 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
     _raioController.dispose();
     super.dispose();
   }
-  
+
   Parcela _construirObjetoParcelaParaSalvar() {
     double? largura, comprimento, raio;
     double area = 0.0;
     if (_formaDaParcela == FormaParcela.retangular) {
-        largura = double.tryParse(_larguraController.text.replaceAll(',', '.'));
-        comprimento = double.tryParse(_comprimentoController.text.replaceAll(',', '.'));
-        area = (largura ?? 0) * (comprimento ?? 0);
-        raio = null;
+      largura = double.tryParse(_larguraController.text.replaceAll(',', '.'));
+      comprimento = double.tryParse(_comprimentoController.text.replaceAll(',', '.'));
+      area = (largura ?? 0) * (comprimento ?? 0);
+      raio = null;
     } else {
-        raio = double.tryParse(_raioController.text.replaceAll(',', '.'));
-        area = math.pi * math.pow(raio ?? 0, 2);
-        largura = null;
-        comprimento = null;
+      raio = double.tryParse(_raioController.text.replaceAll(',', '.'));
+      area = math.pi * math.pow(raio ?? 0, 2);
+      largura = null;
+      comprimento = null;
     }
     return _parcelaAtual.copyWith(
       idParcela: _idParcelaController.text.trim(),
@@ -153,168 +137,12 @@ class _ColetaDadosPageState extends State<ColetaDadosPage> {
     );
   }
 
-  // MÉTODO _pickImage COM AS CORREÇÕES FINAIS E DEFINITIVAS
-
-// MÉTODO _pickImage COM AS CORREÇÕES FINAIS E DEFINITIVAS
-
-Future<void> _pickImage(ImageSource source) async {
-    final XFile? pickedFile = await _picker.pickImage(source: source, imageQuality: 85, maxWidth: 1280);
-    if (pickedFile == null || !mounted) return;
-
-    final bool hasPermission = await _permissionService.requestStoragePermission();
-    if (!hasPermission) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permissão de armazenamento negada.'), backgroundColor: Colors.red));
-      return;
-    }
-
-    try {
-      if (_parcelaAtual.talhaoId == null) {
-        throw Exception("A parcela precisa ser salva e vinculada a um talhão antes de adicionar fotos.");
-      }
-
-      final db = await dbHelper.database;
-      final talhaoMaps = await db.query('talhoes', where: 'id = ?', whereArgs: [_parcelaAtual.talhaoId]);
-      if (talhaoMaps.isEmpty) throw Exception("Talhão vinculado não encontrado no banco de dados.");
-      final talhao = Talhao.fromMap(talhaoMaps.first);
-      final projeto = await dbHelper.getProjetoPelaAtividade(talhao.fazendaAtividadeId);
-      final projetoNome = projeto?.nome.replaceAll(RegExp(r'[^\w\s-]'), '') ?? 'PROJETO';
-      final fazendaNome = _parcelaAtual.nomeFazenda?.replaceAll(RegExp(r'[^\w\s-]'), '') ?? 'FAZENDA';
-      final talhaoNome = _parcelaAtual.nomeTalhao?.replaceAll(RegExp(r'[^\w\s-]'), '') ?? 'TALHAO';
-      final idParcela = _idParcelaController.text.trim().replaceAll(RegExp(r'[^\w\s-]'), '');
-      
-      final prefs = await SharedPreferences.getInstance();
-      String utmString = "UTM N/A";
-      
-      if (_parcelaAtual.latitude != null && _parcelaAtual.longitude != null) {
-        final nomeZona = prefs.getString('zona_utm_selecionada') ?? 'SIRGAS 2000 / UTM Zona 22S';
-        final codigoEpsg = 31982; // Valor de exemplo
-        final projWGS84 = proj4.Projection.get('EPSG:4326')!;
-        final projUTM = proj4.Projection.get('EPSG:$codigoEpsg')!;
-        var pUtm = projWGS84.transform(projUTM, proj4.Point(x: _parcelaAtual.longitude!, y: _parcelaAtual.latitude!));
-        utmString = "E: ${pUtm.x.toInt()} N: ${pUtm.y.toInt()} | ${nomeZona.split('/')[1].trim()}";
-      }
-      
-      final String nomeEquipe = prefs.getString('user_team_name') ?? 'Equipe N/A';
-      final String userRole = prefs.getString('user_role') ?? '';
-      
-      String linhaEquipe = "Equipe: $nomeEquipe";
-      if (userRole.toLowerCase() == 'gerente') {
-        linhaEquipe += " (Gerente)";
-      }
-      
-      final timestamp = DateTime.now();
-      final dataHoraFormatada = DateFormat('dd/MM/yyyy HH:mm:ss').format(timestamp);
-      final nomeArquivoTimestamp = DateFormat('yyyyMMdd_HHmmss').format(timestamp);
-      final String nomeArquivoFinal = "${projetoNome}_${fazendaNome}_${talhaoNome}_${idParcela}_$nomeArquivoTimestamp.jpg";
-      
-      final bytesImagemOriginal = await File(pickedFile.path).readAsBytes();
-      img.Image? imagemEditavel = img.decodeImage(bytesImagemOriginal);
-      if (imagemEditavel == null) throw Exception("Não foi possível decodificar a imagem.");
-
-<<<<<<< HEAD
-      // ===================================================================
-      // === MUDANÇA PRINCIPAL AQUI ===
-      // ===================================================================
-      
-      // 1. Separar o texto em linhas individuais
-      final List<String> linhas = [
-        "Projeto: $projetoNome",
-        "Fazenda: $fazendaNome | Talhao: $talhaoNome | Parcela: $idParcela",
-        utmString,
-        "$linhaEquipe | $dataHoraFormatada"
-      ];
-
-      // 2. Calcular a altura total necessária
-      final int alturaLinha = 28; // Altura aproximada para a fonte arial24
-      final int alturaTotalTexto = linhas.length * alturaLinha;
-      final int alturaFaixa = alturaTotalTexto + 15; // Adiciona uma margem
-
-      // 3. Desenhar a faixa preta
-      img.fillRect(imagemEditavel, x1: 0, y1: imagemEditavel.height - alturaFaixa, x2: imagemEditavel.width, y2: imagemEditavel.height, color: img.ColorRgba8(0, 0, 0, 128));
-
-      // 4. Desenhar cada linha separadamente
-      for (int i = 0; i < linhas.length; i++) {
-        int yPos = (imagemEditavel.height - alturaFaixa) + (i * alturaLinha) + 10;
-        img.drawString(imagemEditavel, linhas[i], font: img.arial24, x: 10, y: yPos, color: img.ColorRgb8(255, 255, 255));
-      }
-      // ===================================================================
-
-      final Uint8List bytesFinais = Uint8List.fromList(img.encodeJpg(imagemEditavel, quality: 85));
-
-      final result = await ImageGallerySaver.saveImage(
-        bytesFinais,
-        quality: 85,
-        name: nomeArquivoFinal,
-        isReturnImagePathOfIOS: true,
-      );
-
-      if (result['isSuccess'] != true) {
-        throw Exception("Falha ao salvar imagem na galeria. Resultado: $result");
-      }
-
-      final String? filePath = result['filePath'];
-      if (filePath != null) {
-        setState(() {
-            _parcelaAtual.photoPaths.add(filePath.replaceFirst('file://', ''));
-        });
-      }
-=======
-      final List<String> linhas = [
-        "Projeto: $projetoNome",
-        "Fazenda: $fazendaNome | Talhao: $talhaoNome | Parcela: $idParcela",
-        utmString,
-        "$linhaEquipe | $dataHoraFormatada"
-      ];
-
-      final int alturaLinha = 28;
-      final int alturaTotalTexto = linhas.length * alturaLinha;
-      final int alturaFaixa = alturaTotalTexto + 15;
-
-      img.fillRect(imagemEditavel, x1: 0, y1: imagemEditavel.height - alturaFaixa, x2: imagemEditavel.width, y2: imagemEditavel.height, color: img.ColorRgba8(0, 0, 0, 128));
-
-      for (int i = 0; i < linhas.length; i++) {
-        int yPos = (imagemEditavel.height - alturaFaixa) + (i * alturaLinha) + 10;
-        img.drawString(imagemEditavel, linhas[i], font: img.arial24, x: 10, y: yPos, color: img.ColorRgb8(255, 255, 255));
-      }
-
-      final Uint8List bytesFinais = Uint8List.fromList(img.encodeJpg(imagemEditavel, quality: 85));
-
-      // ===================================================================
-      // === SUBSTITUIÇÃO DO CÓDIGO ANTIGO PELO NOVO AQUI ===
-      // ===================================================================
-      
-      // Salva a imagem na galeria usando o novo pacote 'gal'
-      await Gal.putImageBytes(bytesFinais, name: nomeArquivoFinal);
-
-      // Adiciona o caminho do arquivo temporário à lista para exibição na tela
-      setState(() {
-          _parcelaAtual.photoPaths.add(pickedFile.path);
-      });
-      
-      // ===================================================================
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto salva na galeria!'), backgroundColor: Colors.green)
-        );
-      }
-
-    } catch (e) {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar foto: $e'), backgroundColor: Colors.red));
-    }
-}
-<<<<<<< HEAD
-
-=======
->>>>>>> 4a417961fe82a356c07fc6beddd78da5e80e7dc1
-
   Future<void> _reabrirParaEdicao() async {
     setState(() => _salvando = true);
     try {
       final parcelaReaberta = _parcelaAtual.copyWith(status: StatusParcela.emAndamento);
       await dbHelper.updateParcela(parcelaReaberta);
-      if(mounted) {
+      if (mounted) {
         setState(() {
           _parcelaAtual = parcelaReaberta;
           _isReadOnly = false;
@@ -330,7 +158,7 @@ Future<void> _pickImage(ImageSource source) async {
 
   Future<void> _salvarEIniciarColeta() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     final parcelaParaSalvar = _construirObjetoParcelaParaSalvar();
 
     if (parcelaParaSalvar.areaMetrosQuadrados <= 0) {
@@ -340,12 +168,12 @@ Future<void> _pickImage(ImageSource source) async {
     setState(() => _salvando = true);
 
     if (!_isModoEdicao) {
-        final parcelaExistente = await dbHelper.getParcelaPorIdParcela(widget.talhao!.id!, _idParcelaController.text.trim());
-        if(parcelaExistente != null && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este ID de Parcela já existe neste talhão.'), backgroundColor: Colors.red));
-            setState(() => _salvando = false);
-            return;
-        }
+      final parcelaExistente = await dbHelper.getParcelaPorIdParcela(widget.talhao!.id!, _idParcelaController.text.trim());
+      if (parcelaExistente != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este ID de Parcela já existe neste talhão.'), backgroundColor: Colors.red));
+        setState(() => _salvando = false);
+        return;
+      }
     }
 
     try {
@@ -354,7 +182,7 @@ Future<void> _pickImage(ImageSource source) async {
 
       if (mounted) {
         await Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => InventarioPage(parcela: parcelaSalva)));
-        Navigator.pop(context, true); 
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red));
@@ -394,14 +222,14 @@ Future<void> _pickImage(ImageSource source) async {
       if (mounted) setState(() => _salvando = false);
     }
   }
-  
+
   Future<void> _salvarAlteracoes() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _salvando = true);
     try {
       final parcelaEditada = _construirObjetoParcelaParaSalvar();
       final parcelaSalva = await dbHelper.saveFullColeta(parcelaEditada, _parcelaAtual.arvores);
-      
+
       if (mounted) {
         setState(() {
           _parcelaAtual = parcelaSalva;
@@ -417,23 +245,23 @@ Future<void> _pickImage(ImageSource source) async {
 
   Future<void> _navegarParaInventario() async {
     if (_salvando) return;
-    
+
     if ((double.tryParse(_larguraController.text.replaceAll(',', '.')) ?? 0) <= 0 && (double.tryParse(_raioController.text.replaceAll(',', '.')) ?? 0) <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Defina e salve a área da parcela antes de continuar.'), backgroundColor: Colors.orange));
       return;
     }
-    
+
     final foiAtualizado = await Navigator.push(context, MaterialPageRoute(builder: (context) => InventarioPage(parcela: _parcelaAtual)));
-    
+
     if (foiAtualizado == true && mounted) {
       _recarregarTela();
     }
   }
-  
+
   Future<void> _recarregarTela() async {
     if (_parcelaAtual.dbId == null) return;
     final parcelaRecarregada = await dbHelper.getParcelaById(_parcelaAtual.dbId!);
-    if(parcelaRecarregada != null && mounted) {
+    if (parcelaRecarregada != null && mounted) {
       final arvoresRecarregadas = await dbHelper.getArvoresDaParcela(parcelaRecarregada.dbId!);
       parcelaRecarregada.arvores = arvoresRecarregadas;
       setState(() {
@@ -456,9 +284,9 @@ Future<void> _pickImage(ImageSource source) async {
         if (permission == LocationPermission.denied) throw 'Permissão negada.';
       }
       if (permission == LocationPermission.deniedForever) throw 'Permissão negada permanentemente.';
-      
+
       final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 20));
-      
+
       setState(() {
         _posicaoAtualExibicao = position;
         _parcelaAtual = _parcelaAtual.copyWith(
@@ -473,7 +301,7 @@ Future<void> _pickImage(ImageSource source) async {
       if (mounted) setState(() => _buscandoLocalizacao = false);
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     double area = 0.0;
@@ -493,48 +321,47 @@ Future<void> _pickImage(ImageSource source) async {
         foregroundColor: Colors.white,
       ),
       body: _salvando && !_buscandoLocalizacao
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_isReadOnly)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(8)),
-                      child: Row(
-                        children: [
-                          Icon(Icons.lock_outline, size: 18, color: Colors.amber.shade800),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text("Parcela concluída (modo de visualização).", style: TextStyle(color: Colors.amber.shade900))),
-                        ],
-                      ),
-                    ),
-                  TextFormField(controller: _nomeFazendaController, enabled: !_isVinculadoATalhao && !_isReadOnly, decoration: const InputDecoration(labelText: 'Nome da Fazenda', border: OutlineInputBorder(), prefixIcon: Icon(Icons.business))),
-                  const SizedBox(height: 16),
-                  TextFormField(controller: _idFazendaController, enabled: !_isVinculadoATalhao && !_isReadOnly, decoration: const InputDecoration(labelText: 'Código da Fazenda', border: OutlineInputBorder(), prefixIcon: Icon(Icons.pin_outlined))),
-                  const SizedBox(height: 16),
-                  TextFormField(controller: _talhaoParcelaController, enabled: !_isVinculadoATalhao && !_isReadOnly, decoration: const InputDecoration(labelText: 'Talhão', border: OutlineInputBorder(), prefixIcon: Icon(Icons.grid_on))),
-                  const SizedBox(height: 16),
-                  TextFormField(controller: _idParcelaController, enabled: !_isReadOnly, decoration: const InputDecoration(labelText: 'ID da parcela', border: OutlineInputBorder(), prefixIcon: Icon(Icons.tag)), validator: (v) => v == null || v.trim().isEmpty ? 'Campo obrigatório' : null),
-                  const SizedBox(height: 16),
-                  _buildCalculadoraArea(area),
-                  const SizedBox(height: 16),
-                  _buildColetorCoordenadas(),
-                  const SizedBox(height: 24),
-                  _buildPhotoSection(),
-                  const SizedBox(height: 16),
-                  TextFormField(controller: _observacaoController, enabled: !_isReadOnly, decoration: const InputDecoration(labelText: 'Observações da Parcela', border: OutlineInputBorder(), prefixIcon: Icon(Icons.comment), helperText: 'Opcional'), maxLines: 3),
-                  const SizedBox(height: 24),
-                  _buildActionButtons(),
-                ],
-              ),
-            ),
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_isReadOnly)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(8)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lock_outline, size: 18, color: Colors.amber.shade800),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text("Parcela concluída (modo de visualização).", style: TextStyle(color: Colors.amber.shade900))),
+                    ],
+                  ),
+                ),
+              TextFormField(controller: _nomeFazendaController, enabled: !_isVinculadoATalhao && !_isReadOnly, decoration: const InputDecoration(labelText: 'Nome da Fazenda', border: OutlineInputBorder(), prefixIcon: Icon(Icons.business))),
+              const SizedBox(height: 16),
+              TextFormField(controller: _idFazendaController, enabled: !_isVinculadoATalhao && !_isReadOnly, decoration: const InputDecoration(labelText: 'Código da Fazenda', border: OutlineInputBorder(), prefixIcon: Icon(Icons.pin_outlined))),
+              const SizedBox(height: 16),
+              TextFormField(controller: _talhaoParcelaController, enabled: !_isVinculadoATalhao && !_isReadOnly, decoration: const InputDecoration(labelText: 'Talhão', border: OutlineInputBorder(), prefixIcon: Icon(Icons.grid_on))),
+              const SizedBox(height: 16),
+              TextFormField(controller: _idParcelaController, enabled: !_isReadOnly, decoration: const InputDecoration(labelText: 'ID da parcela', border: OutlineInputBorder(), prefixIcon: Icon(Icons.tag)), validator: (v) => v == null || v.trim().isEmpty ? 'Campo obrigatório' : null),
+              const SizedBox(height: 16),
+              _buildCalculadoraArea(area),
+              const SizedBox(height: 16),
+              _buildColetorCoordenadas(),
+              const SizedBox(height: 24),
+              // A SEÇÃO DE FOTOS FOI REMOVIDA DAQUI
+              TextFormField(controller: _observacaoController, enabled: !_isReadOnly, decoration: const InputDecoration(labelText: 'Observações da Parcela', border: OutlineInputBorder(), prefixIcon: Icon(Icons.comment), helperText: 'Opcional'), maxLines: 3),
+              const SizedBox(height: 24),
+              _buildActionButtons(),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -549,7 +376,7 @@ Future<void> _pickImage(ImageSource source) async {
         ],
       );
     }
-    
+
     if (_isModoEdicao) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -559,7 +386,7 @@ Future<void> _pickImage(ImageSource source) async {
           SizedBox(height: 50, child: ElevatedButton.icon(onPressed: _salvando ? null : _navegarParaInventario, icon: const Icon(Icons.park_outlined), label: const Text('Ver/Editar Inventário', style: TextStyle(fontSize: 18)), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1D4433), foregroundColor: Colors.white))),
         ],
       );
-    } else { 
+    } else {
       return Row(
         children: [
           Expanded(child: SizedBox(height: 50, child: OutlinedButton(onPressed: _salvando ? null : _finalizarParcelaVazia, style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFF1D4433)), foregroundColor: const Color(0xFF1D4433)), child: const Text('Finalizar Vazia')))),
@@ -618,84 +445,20 @@ Future<void> _pickImage(ImageSource source) async {
           child: Row(children: [
             Expanded(
               child: _buscandoLocalizacao
-                ? const Row(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(width: 16), Text('Buscando...')])
-                : _erroLocalizacao != null
+                  ? const Row(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(width: 16), Text('Buscando...')])
+                  : _erroLocalizacao != null
                   ? Text('Erro: $_erroLocalizacao', style: const TextStyle(color: Colors.red))
                   : (latExibicao == null)
-                    ? const Text('Nenhuma localização obtida.')
-                    : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Lat: ${latExibicao.toStringAsFixed(6)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Text('Lon: ${lonExibicao!.toStringAsFixed(6)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        if (_posicaoAtualExibicao != null && _posicaoAtualExibicao!.accuracy > 0)
-                          Text('Precisão: ±${_posicaoAtualExibicao!.accuracy.toStringAsFixed(1)}m', style: TextStyle(color: Colors.grey[700])),
-                      ]),
+                  ? const Text('Nenhuma localização obtida.')
+                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Lat: ${latExibicao.toStringAsFixed(6)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text('Lon: ${lonExibicao!.toStringAsFixed(6)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                if (_posicaoAtualExibicao != null && _posicaoAtualExibicao!.accuracy > 0)
+                  Text('Precisão: ±${_posicaoAtualExibicao!.accuracy.toStringAsFixed(1)}m', style: TextStyle(color: Colors.grey[700])),
+              ]),
             ),
             IconButton(icon: const Icon(Icons.my_location, color: Color(0xFF1D4433)), onPressed: _buscandoLocalizacao || _isReadOnly ? null : _obterLocalizacaoAtual, tooltip: 'Obter localização'),
           ]),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildPhotoSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Fotos da Parcela', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(8)),
-          child: Column(
-            children: [
-              _parcelaAtual.photoPaths.isEmpty
-                  ? const Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 24.0), child: Text('Nenhuma foto adicionada.')))
-                  : GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8),
-                      itemCount: _parcelaAtual.photoPaths.length,
-                      itemBuilder: (context, index) {
-                        final photoPath = _parcelaAtual.photoPaths[index];
-                        final file = File(photoPath);
-
-                        return Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: file.existsSync()
-                                ? Image.file(file, fit: BoxFit.cover)
-                                : Container( // Placeholder para imagem não encontrada
-                                    color: Colors.grey.shade300,
-                                    child: const Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40),
-                                  ),
-                            ),
-                            if (!_isReadOnly)
-                              Positioned(
-                                top: -8, right: -8,
-                                child: IconButton(
-                                  icon: const CircleAvatar(backgroundColor: Colors.white, radius: 12, child: Icon(Icons.close, color: Colors.red, size: 16)),
-                                  onPressed: () => setState(() => _parcelaAtual.photoPaths.removeAt(index)),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-              if (!_isReadOnly) ...[
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Expanded(child: OutlinedButton.icon(onPressed: () => _pickImage(ImageSource.camera), icon: const Icon(Icons.camera_alt_outlined), label: const Text('Câmera'))),
-                    const SizedBox(width: 8),
-                    Expanded(child: OutlinedButton.icon(onPressed: () => _pickImage(ImageSource.gallery), icon: const Icon(Icons.photo_library_outlined), label: const Text('Galeria'))),
-                  ],
-                ),
-              ]
-            ],
-          ),
         ),
       ],
     );
