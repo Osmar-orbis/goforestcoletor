@@ -1,5 +1,3 @@
-// Caminho: android/app/build.gradle.kts (VERSÃO FINAL E CORRIGIDA)
-
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -18,7 +16,7 @@ if (keyPropertiesFile.exists()) {
 
 android {
     namespace = "com.example.geoforestcoletor"
-    compileSdk = 35 // Updated from 34 to 35
+    compileSdk = 35
 
     signingConfigs {
         create("release") {
@@ -34,7 +32,7 @@ android {
     defaultConfig {
         applicationId = "com.example.geoforestcoletor"
         minSdk = 23
-        targetSdk = 35 // Updated from 34 to 35
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled = true
@@ -49,12 +47,12 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "1.8"
     }
 
     sourceSets {
@@ -66,9 +64,19 @@ flutter {
     source = "../.."
 }
 
+repositories {
+    google()
+    mavenCentral()
+}
+
 dependencies {
-    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
-    implementation("androidx.multidex:multidex:2.0.1")
+    implementation(kotlin("stdlib-jdk7"))
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-perf-ktx")
-    implementation("com.google.firebase:firebase-analytics")
+    // Use a linha abaixo SOMENTE se realmente precisar do app-check-playintegrity!
+    // implementation("com.google.firebase:firebase-app-check-playintegrity:16.1.2")
+    implementation("androidx.multidex:multidex:2.0.1")
 }

@@ -144,14 +144,14 @@ class GeoJsonService {
   }
 
   // Função auxiliar para criar os polígonos no mapa.
-  Polygon _createPolygon(List<LatLng> points, Map<String, dynamic> properties) {
+    Polygon _createPolygon(List<LatLng> points, Map<String, dynamic> properties) {
     final label = (properties['talhao_nome'] ?? properties['talhao_id'] ?? properties['talhao'])?.toString();
     return Polygon(
       points: points,
-      color: const Color(0xFF617359).withAlpha(100),
+      color: const Color(0xFF617359).withAlpha(100), // A presença desta cor já garante o preenchimento
       borderColor: const Color(0xFF1D4433),
       borderStrokeWidth: 1.5,
-      isFilled: true,
+      // isFilled: true, // <<< ESTA LINHA FOI REMOVIDA
       label: label,
       labelStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10),
     );

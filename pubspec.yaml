@@ -9,13 +9,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_app_check: ^0.4.0 # Use a versão mais recente
-  
 
-  # Firebase e Gerenciamento de Estado
+  # Firebase e Gerenciamento de Estado (VERSÕES ATUALIZADAS)
   firebase_core: ^4.0.0
   firebase_auth: ^6.0.0
   cloud_firestore: ^6.0.0
+  firebase_app_check: ^0.4.0
   provider: ^6.1.2
   ml_linalg: ^13.12.6
 
@@ -24,7 +23,7 @@ dependencies:
   latlong2: ^0.9.1
   geolocator: ^14.0.2
   proj4dart: ^2.1.0
-    
+
   # Banco de Dados Local
   sqflite: ^2.3.2
   sqflite_common_ffi: ^2.3.3
@@ -34,20 +33,18 @@ dependencies:
   intl: ^0.20.2
   path: ^1.9.0
   path_provider: ^2.1.5
-  path_provider_android: ^2.2.4 # <<< DEPENDÊNCIA NECESSÁRIA ADICIONADA
+  path_provider_android: ^2.2.4
   shared_preferences: ^2.2.2
   device_info_plus: ^11.5.0
   permission_handler: ^12.0.1
-  image_gallery_saver: ^1.7.1
-  
+  gal: ^2.2.0
+
   # Ferramentas de Arquivos e Compartilhamento
   file_picker: ^10.2.0
   share_plus: ^11.0.0
   csv: ^6.0.0
-  shapefile: ^1.0.1
   pdf: ^3.10.8
   open_file: ^3.5.10
-
   media_scanner: ^2.1.0
 
   # Widgets de UI
@@ -59,38 +56,30 @@ dependencies:
   flutter_map_dragmarker: ^8.0.3
   fl_chart: ^1.0.0
   flutter_archive: ^6.0.3
-  uuid: ^4.3.3 # Ou a versão mais recente
+  uuid: ^4.3.3
 
   # Fotos
   image_picker: ^1.0.7
-  simple_animations: ^5.2.0
   image: ^4.5.4
-  
- 
 
   # Vitrines
   # flutter_stripe: ^10.1.1 # Verifique a versão mais recente no pub.dev
   # cloud_functions: ^4.7.6
-  
-  
-  
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  flutter_launcher_icons: ^0.14.4 # <<< LINHA ADICIONADA (use a versão mais recente)
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - assets/icons/ # <-- É uma boa prática declarar a pasta do ícone aqui também
+    - assets/icons/
 
-# Esta seção está correta e no lugar certo (no mesmo nível de 'flutter:')
 flutter_icons: 
-  android: true # Pode usar "true" para configurações padrão ou "launcher_icon" para nomear o ícone
+  android: true
   ios: true 
   image_path: "assets/icons/icon3.png" 
   remove_alpha_ios: true
-
-    

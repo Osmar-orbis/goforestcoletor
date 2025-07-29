@@ -1,5 +1,3 @@
-// Caminho: android/settings.gradle.kts (VERSÃO PADRÃO E LIMPA)
-
 pluginManagement {
     val flutterSdkPath = run {
         val properties = java.util.Properties()
